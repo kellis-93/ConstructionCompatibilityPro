@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Construction Material Compatibility Checker</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f9fafb;color:#111827;min-height:100vh;}
+    .topbar{background:#fff;border-bottom:1px solid #e5e7eb;padding:0 1.5rem;display:flex;align-items:center;gap:10px;height:54px;position:sticky;top:0;z-index:300;box-shadow:0 1px 3px rgba(0,0,0,0.05);}
+    #root{max-width:960px;margin:0 auto;padding:0 1.25rem 3rem;}
+    button{font-family:inherit;font-size:13px;border:0.5px solid #d1d5db;background:#fff;color:#111827;border-radius:8px;padding:6px 12px;cursor:pointer;transition:background 0.12s;}
+    button:hover{background:#f3f4f6;}
+    button:disabled{opacity:0.6;cursor:not-allowed;}
+    input{font-family:inherit;font-size:13px;border:0.5px solid #d1d5db;background:#fff;color:#111827;border-radius:8px;padding:6px 10px;outline:none;width:100%;}
+    input:focus{border-color:#6366f1;box-shadow:0 0 0 2px rgba(99,102,241,0.12);}
+    .btn-spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.4);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:6px;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    @media(max-width:600px){.topbar-sub{display:none;}}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <i class="ti ti-building-arch" style="font-size:22px;color:#6366f1;"></i>
+    <div>
+      <div style="font-size:15px;font-weight:700;color:#111827;">Construction Material Compatibility</div>
+      <div class="topbar-sub" style="font-size:12px;color:#9ca3af;">Substrates · Primers · Intumescent · Waterproofing · AI product lookup</div>
+    </div>
+  </div>
+  <div id="root"></div>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+  <script type="text/babel" data-presets="react">
+const MATERIALS = [
+  { id: "concrete", label: "Concrete", icon: "ti-building", category: "Masonry", brands: [] },
+  { id: "steel", label: "Steel (Carbon)", icon: "ti-cube", category: "Metal", brands: [] },
+  { id: "stainless_steel", label: "Stainless Steel", icon: "ti-cube", category: "Metal", brands: [] },
+  { id: "aluminum", label: "Aluminum", icon: "ti-layers-subtract", category: "Metal", brands: [] },
+  { id: "copper", label: "Copper", icon: "ti-circuit-voltmeter", category: "Metal", brands: [] },
+  { id: "zinc", label: "Zinc", icon: "ti-cube", category: "Metal", brands: [] },
+  { id: "galvanized_steel", label: "Galvanized Steel", icon: "ti-cube", category: "Metal", brands: [] },
+  { id: "wood", label: "Wood (Untreated)", icon: "ti-trees", category: "Organic", brands: [] },
+  { id: "treated_wood", label: "Treated Wood", icon: "ti-trees", category: "Organic", brands: [] },
+  { id: "brick", label: "Brick", icon: "ti-layout-grid", category: "Masonry", brands: [] },
+  { id: "stone", label: "Stone / Masonry", icon: "ti-mountain", category: "Masonry", brands: [] },
+  { id: "glass", label: "Glass", icon: "ti-square", category: "Mineral", brands: [] },
+  { id: "gypsum", label: "Gypsum / Drywall", icon: "ti-square-rotated", category: "Mineral", brands: [] },
+  { id: "pvc", label: "PVC / Plastic", icon: "ti-pipe", category: "Synthetic", brands: [] },
+  { id: "fiberglass", label: "Fiberglass / FRP", icon: "ti-wave-sine", category: "Synthetic", brands: [] },
+  { id: "asphalt", label: "Asphalt", icon: "ti-road", category: "Synthetic", brands: [] },
+  { id: "zinc_epoxy_primer", label: "Zinc-Rich Epoxy Primer", icon: "ti-droplet", category: "Primers", brands: ["Jotun Barrier 90", "Sherwin-Williams Zinc Clad IV", "International Interzone 505", "Hempel Hempadur Zinc 17360"] },
+  { id: "etch_primer", label: "Wash / Etch Primer", icon: "ti-droplet-half-2", category: "Primers", brands: ["Jotun Penguard Express ZP", "International Intergard 269", "Hempel Wash Primer HB", "Sika Sikagard Etch Primer"] },
+  { id: "epoxy_mastic", label: "Epoxy Mastic Primer/Coat", icon: "ti-droplet-filled", category: "Primers", brands: ["Jotun Jotamastic 87", "Sherwin-Williams Macropoxy 646", "International Interplus 356", "Hempel Hempadur Mastic 45880"] },
+  { id: "alkyd_primer", label: "Alkyd Oil Primer", icon: "ti-droplet-off", category: "Primers", brands: ["Dulux Trade Alkyd Undercoat", "Crown Trade Classic Primer", "Johnstone's Primer Undercoat", "Zinsser Cover Stain"] },
+  { id: "acrylic_primer", label: "Acrylic / Latex Primer", icon: "ti-droplet-half", category: "Primers", brands: ["Dulux Trade Quick-Dry Primer", "Sherwin-Williams PrepRite 200", "Zinsser Bulls Eye 1-2-3", "Parex Weber Primer"] },
+  { id: "intumescent_wb", label: "Water-Based Intumescent Paint", icon: "ti-flame", category: "Intumescent", brands: ["Nullifire WB Series (Tremco)", "Sherwin-Williams Firetex M90WB", "Jotun Steelmaster 120WB", "AkzoNobel Interchar 212"] },
+  { id: "intumescent_sb", label: "Solvent-Based Intumescent Paint", icon: "ti-flame", category: "Intumescent", brands: ["Nullifire S707 (Tremco)", "Jotun Steelmaster 60SB", "Sherwin-Williams Firetex M81", "Carboline Thermo-Lag 3000"] },
+  { id: "intumescent_epoxy", label: "Epoxy Intumescent Coating", icon: "ti-fire-hydrant", category: "Intumescent", brands: ["Chartek 7/8 (AkzoNobel)", "Jotachar 1709 (Jotun)", "Sherwin-Williams Firetex FX6002", "Carboline Pyrocrete 241"] },
+  { id: "bitumen_torch", label: "Torch-On Bituminous Membrane", icon: "ti-layers-intersect", category: "Waterproofing", brands: ["Soprema Sopralene Flam 180", "IKO Permaphalt", "Polyglass Polyflex G", "Bauder Thermofol"] },
+  { id: "bitumen_selfadh", label: "Self-Adhesive Bituminous Membrane", icon: "ti-layers-union", category: "Waterproofing", brands: ["Grace Bituthene 3000", "Sika SA-T", "Henry Blueskin SA", "W.R. Meadows Air-Shield"] },
+  { id: "liquid_pu", label: "Liquid Polyurethane Membrane", icon: "ti-bucket", category: "Waterproofing", brands: ["Sika Liquid Plastics Decothane", "Tremco ExoAir 230", "Mapei Mapelastic HPG", "Tremco Vulkem 350 NF"] },
+  { id: "liquid_pmma", label: "PMMA Liquid Membrane", icon: "ti-bucket-droplet", category: "Waterproofing", brands: ["Kemperol AC (Kemper System)", "Soprema Alsan PMMA", "Sika Sarnafil Liquid G", "Resitrix SK W"] },
+  { id: "crystalline_wp", label: "Crystalline Waterproofing", icon: "ti-diamond", category: "Waterproofing", brands: ["Xypex Concentrate", "Kryton KIM / Krystol", "Sika-1+ Crystalline", "Mapei Aquafin-IC"] },
+  { id: "bentonite_wp", label: "Bentonite Waterproofing (GCL)", icon: "ti-stack-2", category: "Waterproofing", brands: ["Cetco Voltex", "Huesker Bentofix NX", "Colbond Enkadrain GCL", "Naue Carbofol GCL"] },
+  { id: "epdm_membrane", label: "EPDM Sheet Membrane", icon: "ti-square-rounded", category: "Waterproofing", brands: ["Firestone RubberGard EPDM", "Carlisle Sure-Seal", "Sika Sarnafil EPDM", "Hertalan Easy Cover"] },
+  { id: "tpo_membrane", label: "TPO / FPO Membrane", icon: "ti-square-rounded-plus", category: "Waterproofing", brands: ["Sika Sarnafil S327/G410", "Firestone UltraPly TPO", "GAF EverGuard TPO", "Protan SE/SA"] },
+  { id: "polyurea_spray", label: "Polyurea Spray Coating", icon: "ti-spray", category: "Waterproofing", brands: ["BASF MasterSeal 920", "Sika SikaGard-720", "Rhino Linings Rhino 1050", "SPI Line-X / ArmorThane"] },
+  { id: "cementitious_wp", label: "Cementitious Waterproofing Slurry", icon: "ti-droplet-code", category: "Waterproofing", brands: ["Sika-1 / Sika MonoTop", "Mapei Aquafin-IC", "Parchem Hydrostop", "Tremco Tammscrete"] },
+  { id: "elastomeric_acrylic", label: "Elastomeric Acrylic Coating", icon: "ti-paint", category: "Waterproofing", brands: ["Dulux Weathershield Masonry", "Parex Weber DPR", "STO Coat Flex", "Sherwin-Williams Loxon XP"] },
+];
+
+const COMPAT = {};
+function set(a, b, status, notes, conditions = []) {
+  const key = [a, b].sort().join("|");
+  COMPAT[key] = { status, notes, conditions };
+}
+
+// === SUBSTRATE ↔ SUBSTRATE ===
+set("concrete","steel","ok","Classic reinforced concrete. Steel rebar and concrete have compatible thermal expansion and bond very well.",[]);
+set("concrete","stainless_steel","ok","Excellent. Stainless steel is highly resistant to concrete's alkaline environment.",[]);
+set("concrete","aluminum","warn","Concrete's high alkalinity can corrode aluminium over time.",["Apply bituminous coating or isolation layer","Use anodised aluminium where possible","Avoid prolonged moisture contact"]);
+set("concrete","copper","ok","Compatible. Concrete's alkaline environment passivates copper surfaces.",[]);
+set("concrete","zinc","warn","Concrete's alkaline pH corrodes zinc in presence of moisture.",["Apply protective coating to zinc","Control moisture at contact points"]);
+set("concrete","galvanized_steel","warn","Zinc coating may react with fresh concrete alkalis. Acceptable after full cure.",["Allow concrete to fully cure first","Use epoxy-coated rebar in aggressive environments"]);
+set("concrete","wood","warn","Moisture from concrete causes wood rot. A moisture barrier is essential.",["Install polyethylene moisture barrier","Use pressure-treated wood at contact","Ensure adequate ventilation"]);
+set("concrete","treated_wood","ok","Treated wood designed for ground/concrete contact.",["Confirm treatment type is appropriate","Install capillary break at contact"]);
+set("concrete","brick","ok","Highly compatible. Both are cementitious masonry materials.",[]);
+set("concrete","stone","ok","Excellent compatibility. Shared mineral composition and bonding characteristics.",[]);
+set("concrete","glass","ok","Compatible in structural glazing. Flexible sealants required at movement joints.",["Use appropriate flexible sealant at joints","Account for differential thermal movement"]);
+set("concrete","gypsum","warn","Gypsum is attacked by moisture and concrete sulfates.",["Do not use in wet or exterior applications","Install vapour barrier in high-humidity environments"]);
+set("concrete","pvc","ok","PVC is chemically inert and widely used for embedded conduit in concrete.",[]);
+set("concrete","fiberglass","ok","FRP rebar is increasingly used as non-corrosive concrete reinforcement.",[]);
+set("concrete","asphalt","warn","Differential settlement and adhesion issues at joints.",["Design proper expansion joints","Use transition sections to manage differential movement"]);
+set("steel","stainless_steel","warn","Galvanic couple in moisture. Carbon steel corrodes preferentially.",["Use insulating gaskets or isolation tape","Apply corrosion-resistant coatings to carbon steel"]);
+set("steel","aluminum","bad","Strong galvanic corrosion. Aluminium corrodes rapidly in contact with steel in wet conditions.",["Never allow direct contact in wet environments","Use neoprene or PTFE isolation","Apply zinc-rich primer to steel as minimum protection"]);
+set("steel","copper","warn","Copper is cathodic to steel; steel corrodes. Avoid direct contact in wet conditions.",["Use electrical isolation (neoprene pads, plastic sleeves)","Ensure water cannot flow from copper onto steel"]);
+set("steel","zinc","ok","Zinc sacrificially protects steel — the basis of galvanizing.",[]);
+set("steel","galvanized_steel","ok","Highly compatible. Galvanised zinc coating protects the underlying steel.",[]);
+set("steel","wood","warn","Steel fasteners in wood cause staining and corrosion in wet conditions.",["Use galvanised, stainless or hot-dip fasteners outdoors","Apply wood preservative at contact points"]);
+set("steel","treated_wood","bad","ACQ and CA wood treatments are highly corrosive to standard steel.",["Use hot-dip galvanised or stainless steel fasteners only","NEVER use electroplated zinc fasteners","Check treatment manufacturer specifications"]);
+set("steel","brick","warn","Steel lintels and ties corrode from mortar moisture.",["Use stainless steel or HDG masonry ties","Provide adequate mortar cover","Apply corrosion-resistant coating"]);
+set("steel","stone","warn","Ensure adequate corrosion protection for embedded steel.",["Use stainless or galvanised anchors","Ensure proper cover and drainage"]);
+set("steel","glass","ok","Common in structural glazing and curtain wall.",["Install thermal break to prevent condensation"]);
+set("steel","gypsum","warn","Steel framing corrodes in high-humidity environments.",["Use corrosion-resistant drywall screws","Maintain humidity control"]);
+set("steel","pvc","ok","Chemically compatible. PVC does not corrode steel.",[]);
+set("steel","fiberglass","ok","FRP cladding provides excellent corrosion resistance over steel.",[]);
+set("steel","asphalt","ok","Steel piles and sheet piling are commonly used with asphalt pavements.",[]);
+set("stainless_steel","aluminum","warn","Lower galvanic risk than carbon steel/aluminium but isolation recommended in wet or coastal exposure.",["Use isolation in marine or coastal environments","Anodised aluminium reduces galvanic risk"]);
+set("stainless_steel","copper","ok","Low galvanic potential. Generally compatible in normal atmospheric conditions.",[]);
+set("stainless_steel","zinc","warn","Zinc is anodic to stainless and may sacrifice in wet conditions.",["Avoid direct prolonged contact in wet environments"]);
+set("stainless_steel","galvanized_steel","warn","Zinc corrodes preferentially when coupled with stainless steel in wet conditions.",["Use isolation pads in wet environments"]);
+set("stainless_steel","wood","ok","Stainless is the preferred fastener type for all wood applications.",[]);
+set("stainless_steel","treated_wood","ok","Excellent. Type 316 stainless recommended for ACQ/CA-treated lumber.",["Use Type 316 stainless for treated wood"]);
+set("stainless_steel","brick","ok","Preferred material for exposed masonry ties and lintels.",[]);
+set("stainless_steel","stone","ok","Standard material for stone cladding anchors and dowels.",[]);
+set("stainless_steel","glass","ok","Widely used in point-fixed and structural glazing.",[]);
+set("stainless_steel","gypsum","ok","Stainless drywall screws provide best resistance in humid environments.",[]);
+set("stainless_steel","pvc","ok","Fully compatible.",[]);
+set("stainless_steel","fiberglass","ok","Excellent combination for corrosion-resistant assemblies.",[]);
+set("stainless_steel","asphalt","ok","Stainless steel is resistant to asphalt's chemical environment.",[]);
+set("aluminum","copper","bad","Very high galvanic potential. Aluminium corrodes aggressively when coupled with copper.",["Never allow direct contact in wet conditions","Use PTFE or neoprene isolation","Ensure water cannot drain from copper onto aluminium"]);
+set("aluminum","zinc","warn","Some galvanic potential. Zinc may corrode if coupled with aluminium in wet conditions.",["Use isolation in immersion or splash-zone applications"]);
+set("aluminum","galvanized_steel","warn","Zinc coating creates a more favourable couple than bare steel, but isolation advised outdoors.",["Use isolation for exterior applications"]);
+set("aluminum","wood","ok","Generally compatible. Aluminium window frames and cladding on wood structures are common.",["Use aluminium or stainless fasteners","Provide thermal break where condensation risk exists"]);
+set("aluminum","treated_wood","bad","ACQ and CA wood treatments are very corrosive to aluminium.",["NEVER use aluminium fasteners with treated lumber","Install isolation between aluminium and treated wood"]);
+set("aluminum","brick","ok","Compatible. Aluminium window frames in masonry openings are a common durable system.",["Provide appropriate sealant at perimeter"]);
+set("aluminum","stone","ok","Compatible. Aluminium curtain wall against stone is widely used.",[]);
+set("aluminum","glass","ok","Aluminium is the dominant framing material for glass curtain walls.",["Install thermal break to prevent condensation"]);
+set("aluminum","gypsum","ok","Aluminium framing and gypsum wallboard are widely compatible.",[]);
+set("aluminum","pvc","ok","Compatible. Both commonly used in fenestration and cladding.",[]);
+set("aluminum","fiberglass","ok","Compatible and commonly combined in composite panel systems.",[]);
+set("aluminum","asphalt","warn","Some asphalt formulations can stain or degrade aluminium.",["Apply clear lacquer or anodise aluminium surfaces"]);
+set("copper","zinc","bad","Very high galvanic potential. Zinc corrodes rapidly when coupled with copper.",["Never use galvanised fasteners with copper","Ensure water runoff from copper does not contact zinc/galvanised materials"]);
+set("copper","galvanized_steel","bad","Copper is strongly cathodic — galvanising (zinc) sacrifices rapidly.",["Avoid all direct contact","Ensure copper drainage does not run onto galvanised surfaces"]);
+set("copper","wood","ok","Compatible. Copper historically used as wood preservative.",["Note: copper compounds corrode non-stainless fasteners"]);
+set("copper","treated_wood","ok","Compatible. Copper compounds in treated wood are chemically similar.",["Use copper or stainless fasteners"]);
+set("copper","brick","ok","Fully compatible. Copper flashing and masonry are a classic durable combination.",[]);
+set("copper","stone","ok","Compatible. Copper gutters and copper-clad roofs with stone are historically proven.",[]);
+set("copper","glass","ok","Compatible. Copper glazing bars used in traditional and heritage applications.",[]);
+set("copper","gypsum","ok","Compatible for interior applications.",[]);
+set("copper","pvc","warn","Generally compatible but avoid certain plasticised PVC at elevated temperatures.",["Use dielectric fittings where required by code"]);
+set("copper","fiberglass","ok","Compatible. Used in corrosion-resistant piping and electrical enclosures.",[]);
+set("copper","asphalt","ok","Compatible. Copper drain pipes in asphalt pavements are widely used.",[]);
+set("zinc","galvanized_steel","ok","Chemically identical surface. Fully compatible.",[]);
+set("zinc","wood","ok","Compatible. Zinc strips used for moss/algae control on roofs.",[]);
+set("zinc","treated_wood","warn","Modern wood treatments can attack zinc.",["Test with specific treatment formulation","Use stainless fasteners as safer alternative"]);
+set("zinc","brick","ok","Compatible. Zinc coping and flashing on masonry is a common durable assembly.",[]);
+set("zinc","stone","ok","Compatible. Zinc flashing against stone is widely used.",[]);
+set("zinc","glass","ok","Compatible. Used in zinc-framed glazing systems.",[]);
+set("zinc","gypsum","ok","Compatible for interior applications.",[]);
+set("zinc","pvc","ok","Chemically compatible.",[]);
+set("zinc","fiberglass","ok","Compatible.",[]);
+set("zinc","asphalt","ok","Compatible. Zinc-coated elements used in road construction hardware.",[]);
+set("galvanized_steel","wood","warn","Modern treated wood can still attack galvanising.",["Verify compatibility with specific treatment type","Use HDG minimum for treated lumber contact"]);
+set("galvanized_steel","treated_wood","warn","ACQ and CA treatments may corrode galvanised coating. HDG acceptable for some treatments; stainless preferred.",["Consult treatment manufacturer for approved fastener types"]);
+set("galvanized_steel","brick","ok","Standard material for masonry ties and lintels.",[]);
+set("galvanized_steel","stone","ok","Galvanised anchors are commonly used in stone cladding.",[]);
+set("galvanized_steel","glass","ok","Compatible for secondary structural applications.",[]);
+set("galvanized_steel","gypsum","ok","Standard drywall framing is galvanised steel — excellent compatibility.",[]);
+set("galvanized_steel","pvc","ok","Compatible. Common in conduit and framing applications.",[]);
+set("galvanized_steel","fiberglass","ok","Compatible.",[]);
+set("galvanized_steel","asphalt","ok","Widely used for road construction hardware.",[]);
+set("wood","treated_wood","ok","Compatible. Ensure adequate separation if different treatment types.",[]);
+set("wood","brick","warn","Wood embedded in masonry is vulnerable to moisture and insects.",["Never embed untreated wood in masonry","Provide clearance or use treated wood","Detail for drainage and ventilation"]);
+set("wood","stone","warn","Wood in contact with stone accumulates moisture.",["Use treated wood or provide isolation","Detail for drainage at contact"]);
+set("wood","glass","ok","Traditional wood-framed windows are a proven assembly.",["Apply finish to all wood surfaces","Seal glazing with appropriate sealant"]);
+set("wood","gypsum","ok","Standard wood framing with gypsum wallboard is the most common interior construction system.",[]);
+set("wood","pvc","ok","Compatible. PVC trim used alongside wood framing is standard.",[]);
+set("wood","fiberglass","ok","Compatible. Fiberglass batt insulation in wood framing is standard.",[]);
+set("wood","asphalt","warn","Coal-tar asphalt can degrade wood over time.",["Use appropriate underlayment between wood deck and asphalt"]);
+set("treated_wood","brick","ok","Treated wood sill plates on masonry foundations are standard practice.",["Install sill sealer/moisture barrier"]);
+set("treated_wood","stone","ok","Compatible with appropriate moisture barrier detail.",["Provide capillary break"]);
+set("treated_wood","glass","ok","Compatible. Used in outbuildings and low-cost construction.",[]);
+set("treated_wood","gypsum","ok","Compatible for interior applications.",[]);
+set("treated_wood","pvc","ok","Compatible. PVC trim commonly used with treated wood decking.",[]);
+set("treated_wood","fiberglass","ok","Compatible.",[]);
+set("treated_wood","asphalt","warn","Use appropriate underlayment to prevent chemical leaching.",["Install appropriate underlayment between treated wood and asphalt"]);
+set("brick","stone","ok","Fully compatible masonry materials. Used in combination in traditional construction.",[]);
+set("brick","glass","ok","Compatible. Glass block walls and window openings in brick are standard.",["Account for differential movement","Use appropriate sealant"]);
+set("brick","gypsum","ok","Compatible. Gypsum plaster on brick or gypsum board against brick are standard assemblies.",[]);
+set("brick","pvc","ok","Compatible. PVC window frames in brick openings are very common.",["Install with foam backing rod and sealant at perimeter"]);
+set("brick","fiberglass","ok","Compatible.",[]);
+set("brick","asphalt","ok","Compatible. Brick edging at asphalt pavement is a common durable landscape detail.",[]);
+set("stone","glass","ok","Compatible. Stone-framed buildings with glass infill are a classic modern combination.",["Design for differential movement"]);
+set("stone","gypsum","ok","Compatible for interior use. Gypsum plaster on stone walls is a traditional finish.",[]);
+set("stone","pvc","ok","Compatible.",[]);
+set("stone","fiberglass","ok","Compatible.",[]);
+set("stone","asphalt","ok","Compatible. Stone cobbles and asphalt used in pavement transitions.",[]);
+set("glass","gypsum","ok","Compatible for interior partitioning and finish applications.",[]);
+set("glass","pvc","ok","PVC gaskets and trim are standard glazing components.",[]);
+set("glass","fiberglass","ok","Compatible. FRP pultrusions used in window framing.",[]);
+set("glass","asphalt","ok","Glass cullet is used as aggregate in some asphalt formulations.",[]);
+set("gypsum","pvc","ok","Fully compatible. PVC trim and accessories used extensively with gypsum wallboard.",[]);
+set("gypsum","fiberglass","ok","Fiberglass batt insulation and gypsum wallboard used together in standard assemblies.",[]);
+set("gypsum","asphalt","warn","Gypsum should not be used in wet or exterior applications.",["Use only in dry interior conditions"]);
+set("pvc","fiberglass","ok","Chemically compatible synthetic materials. Used together in drainage and industrial systems.",[]);
+set("pvc","asphalt","ok","PVC pipe conduit runs through asphalt pavements — standard practice.",[]);
+set("fiberglass","asphalt","ok","Fiberglass geogrid is used to reinforce asphalt overlays — highly compatible.",[]);
+
+// === PRIMERS ↔ SUBSTRATES ===
+set("zinc_epoxy_primer","steel","ok","Ideal system for carbon steel. Zinc particles provide cathodic protection; the epoxy binder gives excellent adhesion and barrier protection.",["Blast-clean steel to Sa 2.5 (ISO 8501-1) minimum","Apply at 50–75 μm DFT","Overcoat within manufacturer's recoat window"]);
+set("zinc_epoxy_primer","galvanized_steel","warn","Applying zinc-rich primer over existing zinc coating is generally unnecessary and can cause adhesion issues.",["Only use for repair of damaged galvanising","A sweep blast or chemical pre-treatment improves adhesion"]);
+set("zinc_epoxy_primer","stainless_steel","warn","Not recommended as primary primer for stainless steel. Etch or epoxy mastic primers adhere better.",["Use an etch primer specifically formulated for stainless","Confirm with coating manufacturer"]);
+set("zinc_epoxy_primer","aluminum","bad","Not suitable for aluminium. Provides no benefit and will cause adhesion failure.",["Use a wash/etch primer or specialist aluminium epoxy primer","Do not use zinc-rich coatings on aluminium"]);
+set("zinc_epoxy_primer","copper","bad","Not intended for copper substrates. Adhesion will be poor.",["Use a specialist copper primer or epoxy mastic"]);
+set("zinc_epoxy_primer","concrete","bad","Zinc-rich epoxy primers are designed exclusively for steel and will not bond to concrete.",["Use an epoxy mastic or acrylic primer for concrete"]);
+set("zinc_epoxy_primer","wood","bad","Not suitable for wood substrates.",["Use an alkyd or acrylic primer for wood"]);
+set("zinc_epoxy_primer","treated_wood","bad","Not suitable for treated wood.",["Use an appropriate alkyd or acrylic primer"]);
+set("zinc_epoxy_primer","brick","bad","Not suitable for masonry substrates.",["Use an acrylic or epoxy mastic primer for masonry"]);
+set("zinc_epoxy_primer","stone","bad","Not suitable for stone substrates.",["Use an acrylic or epoxy mastic primer for stone"]);
+set("zinc_epoxy_primer","gypsum","bad","Not suitable for gypsum board.",["Use an acrylic primer for gypsum"]);
+set("zinc_epoxy_primer","glass","bad","Not suitable for glass.",["Use specialist glass adhesion promoters"]);
+set("zinc_epoxy_primer","pvc","bad","Not suitable for PVC.",["Use specialist plastic adhesion promoters"]);
+set("zinc_epoxy_primer","fiberglass","warn","Not typically used on GRP/FRP. Adhesion is poor without significant surface preparation.",["Use a specialist GRP primer or epoxy mastic","Abrade surface thoroughly and apply etch primer first"]);
+set("zinc_epoxy_primer","asphalt","bad","Not suitable for asphalt.",["Use a bituminous primer for asphalt surfaces"]);
+set("zinc_epoxy_primer","zinc","warn","Redundant over intact zinc. Acceptable for repair work only.",["Ensure zinc surface is clean, dry and degreased","A sweep blast improves adhesion"]);
+set("etch_primer","steel","ok","Excellent adhesion promoter for steel. Phosphoric acid etches the surface and provides a conversion coating for improved corrosion resistance.",["Apply thin coat (max 25 μm DFT)","Overcoat promptly — not a standalone coating","Do not apply in temperatures below 5°C"]);
+set("etch_primer","stainless_steel","ok","Good adhesion promoter for stainless steel, which is difficult to coat due to its passive oxide layer.",["Abrade or grit-blast surface before application","Apply a thin, even coat and overcoat promptly"]);
+set("etch_primer","aluminum","ok","Excellent primer for aluminium. The acidic formulation etches the passive oxide layer creating an excellent bond for subsequent coats.",["Apply thin coat — excess causes adhesion problems","Overcoat within 24–48 hours","Ideal under epoxy or polyurethane topcoats"]);
+set("etch_primer","galvanized_steel","ok","Effective adhesion promoter for galvanised steel and zinc surfaces, which are otherwise difficult to coat directly.",["Apply thin coat and overcoat promptly"]);
+set("etch_primer","zinc","ok","Good adhesion promotion for bare zinc surfaces.",["Same guidance as galvanised steel"]);
+set("etch_primer","copper","ok","Can be used on copper to improve adhesion of subsequent coatings.",["Ensure surface is clean and degreased before application"]);
+set("etch_primer","concrete","warn","Not designed for concrete. An epoxy mastic or specialist concrete primer is far more appropriate.",["Use an epoxy mastic or specialist concrete primer instead"]);
+set("etch_primer","wood","warn","Not typically used on wood. Alkyd or acrylic primers are more appropriate.",["Only use if specifically recommended by the coating system manufacturer"]);
+set("etch_primer","brick","bad","Not suitable for masonry.",["Use an acrylic or epoxy mastic primer for masonry"]);
+set("etch_primer","stone","bad","Not suitable for stone substrates.",["Use an acrylic or epoxy mastic primer"]);
+set("etch_primer","glass","warn","Can improve adhesion on glass but requires careful application.",["Confirm with coating manufacturer before use on glass"]);
+set("etch_primer","gypsum","bad","Not suitable for gypsum.",["Use an acrylic primer for gypsum"]);
+set("etch_primer","pvc","bad","Not suitable for PVC.",["Use specialist PVC primers"]);
+set("etch_primer","fiberglass","warn","Can be used on GRP/FRP to improve adhesion before epoxy topcoats.",["Abrade surface thoroughly first","Apply thin coat and overcoat promptly"]);
+set("etch_primer","asphalt","bad","Not suitable for asphalt.",["Use a bituminous primer"]);
+set("etch_primer","treated_wood","bad","Not suitable for treated wood.",["Use alkyd or acrylic primer"]);
+set("epoxy_mastic","steel","ok","Versatile, high-build primer and topcoat for steel. Excellent adhesion, corrosion resistance, and chemical resistance.",["Apply to Sa 2.5 or minimum St 2/3 surfaces","Apply at recommended DFT (typically 100–150 μm per coat)","Use as primer under intumescent or specialist topcoats"]);
+set("epoxy_mastic","stainless_steel","ok","Compatible with stainless steel with proper surface preparation.",["Sweep blast or abrade stainless before application"]);
+set("epoxy_mastic","aluminum","ok","Compatible with aluminium with proper preparation.",["Apply etch primer first to improve adhesion","Ensure surface is clean, dry and degreased"]);
+set("epoxy_mastic","galvanized_steel","ok","Excellent system over galvanised steel. Epoxy mastic fills surface imperfections and provides a good barrier.",["Ensure surface is clean and degreased","Sweep blast where possible"]);
+set("epoxy_mastic","zinc","ok","Compatible. Epoxy mastic is commonly used over zinc-sprayed or zinc-coated surfaces.",["Ensure zinc surface is clean and dry"]);
+set("epoxy_mastic","copper","warn","Can be used over copper with appropriate preparation, but specialist copper primers may be preferred.",["Confirm manufacturer recommendation for copper substrates"]);
+set("epoxy_mastic","concrete","ok","Excellent primer and barrier coating for concrete. Good adhesion and reduces moisture transmission.",["Ensure concrete is cured (minimum 28 days) and dry","Apply at recommended coverage rate","Use as primer under waterproofing membranes"]);
+set("epoxy_mastic","brick","ok","Compatible with brick and masonry as a primer and barrier coat.",["Ensure surface is clean, dry and friable material removed"]);
+set("epoxy_mastic","stone","ok","Compatible. Epoxy mastic used as a primer and protective barrier on stone.",["Ensure stone surface is clean and dry"]);
+set("epoxy_mastic","wood","warn","Not typically recommended for wood — epoxy mastic can be too rigid and may crack with wood movement.",["Use alkyd or acrylic primer for most wood applications"]);
+set("epoxy_mastic","treated_wood","warn","Same limitations as untreated wood. Rigidity of epoxy can cause cracking with wood movement.",["Use alkyd or acrylic primer as preferred system"]);
+set("epoxy_mastic","gypsum","warn","Epoxy mastic can be used on gypsum board but is heavy. Acrylic primer is more appropriate for standard applications.",["Use acrylic primer for standard gypsum wallboard"]);
+set("epoxy_mastic","glass","bad","Epoxy mastic is not suitable for glass. Poor adhesion without specialist preparation.",["Use specialist glass adhesion promoters"]);
+set("epoxy_mastic","pvc","bad","Not suitable for PVC without significant preparation.",["Use specialist plastic adhesion promoters"]);
+set("epoxy_mastic","fiberglass","warn","Can be used on GRP/FRP with proper abrasive preparation.",["Abrade surface thoroughly","Apply etch primer first for improved adhesion","Confirm with manufacturer"]);
+set("epoxy_mastic","asphalt","warn","Can be used as a primer over asphalt in some waterproofing applications, but compatibility varies.",["Always confirm with membrane manufacturer","Allow asphalt to cure fully before application"]);
+set("alkyd_primer","steel","warn","Suitable for steel in dry interior applications only. Not for corrosive or wet environments.",["Use only in dry interior locations","Not suitable for marine or coastal environments"]);
+set("alkyd_primer","wood","ok","Traditional and effective primer for wood. Excellent penetration, adhesion and grain sealing.",["Apply to clean, dry, sanded wood","Apply an additional undercoat before the topcoat"]);
+set("alkyd_primer","treated_wood","warn","Some treated wood preservatives interfere with alkyd adhesion. Test compatibility first.",["Allow treated wood to weather for several months before painting","Test adhesion before full application"]);
+set("alkyd_primer","brick","ok","Compatible with brick and masonry. Good penetration into the porous surface.",["Ensure surface is clean, dry and free of efflorescence"]);
+set("alkyd_primer","stone","ok","Compatible with natural stone. Good penetration.",["Ensure stone is clean and dry"]);
+set("alkyd_primer","gypsum","ok","Compatible with gypsum board, though acrylic primers are generally faster and lower odour.",["Allow primer to dry fully before applying topcoat"]);
+set("alkyd_primer","aluminum","bad","Alkyd oil primers undergo saponification on aluminium, causing the paint to soften and peel.",["NEVER apply alkyd primers to aluminium","Use an etch primer followed by epoxy or polyurethane topcoat"]);
+set("alkyd_primer","galvanized_steel","bad","Alkyd primers undergo saponification in contact with zinc, causing early adhesion failure. A well-known and critical incompatibility.",["NEVER apply alkyd primers to galvanised steel or zinc","Use an etch primer or epoxy mastic designed for galvanised surfaces"]);
+set("alkyd_primer","zinc","bad","Same as galvanised steel — saponification causes premature failure.",["Use an etch primer or epoxy mastic for zinc surfaces"]);
+set("alkyd_primer","stainless_steel","bad","Alkyd primers are not recommended for stainless steel. Poor adhesion and potential saponification.",["Use an etch primer followed by appropriate topcoat"]);
+set("alkyd_primer","copper","warn","Marginal compatibility. Alkyd primers can be used over copper in some applications but are not ideal.",["Confirm with paint manufacturer","Ensure copper surface is clean and free of oxide"]);
+set("alkyd_primer","glass","bad","Not suitable for glass substrates.",["Use specialist glass adhesion promoters"]);
+set("alkyd_primer","pvc","bad","Not suitable for PVC without specialist adhesion promoters.",["Use specialist plastic primers"]);
+set("alkyd_primer","fiberglass","warn","Can be used on GRP/FRP in some applications but may not provide sufficient adhesion.",["Abrade surface thoroughly","Test adhesion before committing"]);
+set("alkyd_primer","asphalt","warn","Alkyd primers are not typically used over asphalt.",["Use a bituminous primer over asphalt"]);
+set("alkyd_primer","concrete","warn","Alkyd primers can have adhesion problems on new concrete due to high pH.",["Allow concrete to cure and dry for minimum 3–6 months","Prefer acrylic or epoxy primer for concrete"]);
+set("acrylic_primer","concrete","ok","Excellent primer for concrete. Water-based acrylic primers are widely used as the first coat on concrete.",["Ensure concrete is cured and dry","Apply at manufacturer's recommended coverage"]);
+set("acrylic_primer","brick","ok","Excellent primer for brick and masonry. Penetrates the porous surface and seals it.",["Ensure surface is clean, dry and free of efflorescence"]);
+set("acrylic_primer","stone","ok","Compatible with natural stone. Good penetration and sealing.",["Ensure stone is clean and dry"]);
+set("acrylic_primer","gypsum","ok","The standard primer for gypsum board. Seals the paper face and provides a uniform base.",["Apply one coat before topcoat","Use a dedicated drywall primer for best results"]);
+set("acrylic_primer","wood","ok","Suitable for wood. Water-based acrylic primers are increasingly favoured over alkyd for indoor and outdoor use.",["Apply to clean, dry, sanded wood"]);
+set("acrylic_primer","treated_wood","ok","Compatible with treated wood.",["Allow treated wood to dry to moisture content below 18%"]);
+set("acrylic_primer","galvanized_steel","ok","Suitable as a primer coat for galvanised steel in low-to-medium exposure environments.",["Ensure surface is clean and free of white rust","Use an etch primer in high-exposure or marine environments"]);
+set("acrylic_primer","aluminum","ok","Suitable for aluminium in light-duty applications.",["Ensure aluminium is clean, dry and degreased","Use an etch primer in structural applications"]);
+set("acrylic_primer","steel","warn","Acrylic primers offer minimal corrosion protection on steel and are not suitable for structural steel.",["Use a zinc-rich epoxy primer or epoxy mastic for structural steel"]);
+set("acrylic_primer","stainless_steel","ok","Suitable as a light-duty primer over stainless steel.",["Ensure surface is clean and degreased"]);
+set("acrylic_primer","zinc","ok","Suitable for zinc surfaces in light-duty applications.",["Ensure zinc surface is clean and free of white rust"]);
+set("acrylic_primer","glass","warn","Acrylic primers have limited adhesion to glass.",["Use a dedicated glass primer if painting glass"]);
+set("acrylic_primer","pvc","warn","Adhesion to PVC varies significantly. Test before committing.",["Use a dedicated PVC adhesion promoter for best results"]);
+set("acrylic_primer","fiberglass","warn","Variable adhesion on GRP/FRP. Abrade surface thoroughly.",["Abrade surface with 80-grit paper before application","Test adhesion before full application"]);
+set("acrylic_primer","asphalt","warn","Acrylic primers can be used over asphalt as an intermediate coat in some systems.",["Confirm with the specific product manufacturer","Allow asphalt to cure fully before application"]);
+set("acrylic_primer","copper","warn","Limited adhesion to copper. Test before committing.",["Ensure copper is clean, dry and degreased"]);
+
+// === INTUMESCENT ↔ SUBSTRATES ===
+set("intumescent_wb","steel","ok","Water-based intumescent coatings are the most common fire protection system for structural steel in buildings (R15–R120). Must be applied over a compatible primer system.",["Apply over a zinc-rich epoxy or etch primer","Apply at the DFT specified in the fire test evidence","Protect with a compatible sealer/topcoat for exterior or humid environments","Always verify the complete system (primer + intumescent + sealer) is tested to the required fire period"]);
+set("intumescent_wb","galvanized_steel","ok","Suitable for galvanised steel with a compatible primer.",["Use an etch primer or epoxy mastic primer first","Verify the system is fire-test approved for galvanised steel"]);
+set("intumescent_wb","stainless_steel","ok","Compatible. Specialist intumescent systems are available for stainless steel.",["Confirm the specific product is approved for stainless steel","Use a compatible etch or epoxy primer"]);
+set("intumescent_wb","aluminum","warn","Not typically applied to aluminium structural members. Aluminium has lower fire resistance requirements and different protection strategies.",["Consult fire engineer for aluminium fire protection strategies"]);
+set("intumescent_wb","concrete","warn","Intumescent paint is not typically used for concrete fire protection. Cementitious spray or intumescent mats are more common.",["Consult fire engineer","Consider cementitious fireproofing for concrete"]);
+set("intumescent_wb","wood","warn","Some water-based intumescent paints are formulated for timber to achieve Class B or A2 surface spread of flame ratings. These are different products from steel intumescent coatings.",["Use a product specifically formulated and tested for timber","Check the fire rating achieved on the specific timber species","Apply at the DFT specified in the test evidence"]);
+set("intumescent_wb","treated_wood","warn","Compatibility between intumescent paint and wood preservatives must be verified. Some treatments inhibit adhesion.",["Test compatibility with the specific wood treatment","Apply over a compatible primer if required"]);
+set("intumescent_wb","brick","bad","Not applied to masonry. Masonry has inherent fire resistance.",["Masonry does not require intumescent protection"]);
+set("intumescent_wb","stone","bad","Not applicable to stone substrates.",["Stone has inherent fire resistance"]);
+set("intumescent_wb","glass","bad","Not applicable to glass substrates.",["Use fire-rated glazing systems"]);
+set("intumescent_wb","gypsum","bad","Not applicable to gypsum board.",["Gypsum board itself is fire-rated; use the correct board specification"]);
+set("intumescent_wb","pvc","bad","Not applicable to PVC.",["PVC requires intumescent strips or fire-rated enclosures"]);
+set("intumescent_wb","fiberglass","warn","Specialist intumescent coatings for GRP/FRP are available but standard steel intumescent products are not typical for FRP.",["Confirm with the intumescent manufacturer for FRP applications"]);
+set("intumescent_wb","asphalt","bad","Not applicable to asphalt.",[]);
+set("intumescent_wb","copper","bad","Not applicable to copper substrates in standard fire protection.",[]);
+set("intumescent_wb","zinc","bad","Not a standard application for zinc substrates.",[]);
+set("intumescent_sb","steel","ok","Solvent-based intumescent paints are preferred for exterior, high humidity, or aggressive environments where water-based products may not achieve full performance.",["Apply over a zinc-rich epoxy or etch primer","Apply at the DFT specified in the fire test evidence","Requires adequate ventilation during application","Always verify the complete system is fire-test approved"]);
+set("intumescent_sb","galvanized_steel","ok","Suitable for galvanised steel with a compatible primer. Solvent-based is more tolerant of humid conditions during curing.",["Use an etch or epoxy mastic primer first","Verify system is fire-test approved for galvanised substrates"]);
+set("intumescent_sb","stainless_steel","ok","Compatible where specialist products are available.",["Confirm the specific product is approved for stainless steel"]);
+set("intumescent_sb","aluminum","warn","Not a typical application for aluminium.",["Consult fire engineer"]);
+set("intumescent_sb","concrete","warn","Not typically used for concrete fire protection.",["Consider cementitious or intumescent mat systems for concrete"]);
+set("intumescent_sb","wood","bad","Solvent-based steel intumescent coatings are not formulated for timber.",["Use a water-based intumescent or specialist timber intumescent product"]);
+set("intumescent_sb","treated_wood","bad","Not suitable for treated timber.",["Use a water-based timber intumescent product"]);
+set("intumescent_sb","brick","bad","Not applicable to masonry.",["Masonry has inherent fire resistance"]);
+set("intumescent_sb","stone","bad","Not applicable.",["Stone has inherent fire resistance"]);
+set("intumescent_sb","glass","bad","Not applicable.",["Use fire-rated glazing"]);
+set("intumescent_sb","gypsum","bad","Not applicable.",["Use appropriate fire-rated gypsum board specification"]);
+set("intumescent_sb","pvc","bad","Not applicable.",["Use intumescent strips or fire-rated enclosures for PVC"]);
+set("intumescent_sb","fiberglass","warn","Specialist products may be available but not standard.",["Confirm with intumescent manufacturer"]);
+set("intumescent_sb","asphalt","bad","Not applicable.",[]);
+set("intumescent_sb","copper","bad","Not applicable.",[]);
+set("intumescent_sb","zinc","bad","Not a standard application.",[]);
+set("intumescent_epoxy","steel","ok","Epoxy intumescent coatings are used for hydrocarbon (pool) fire protection and extreme process environments in petrochemical, offshore and industrial facilities.",["Apply over a zinc-rich epoxy primer to blast-cleaned steel (Sa 2.5)","Applied by specialist contractors — heavy DFT (typically 5–30mm total)","Verify the complete system is certified to the required fire rating (UL 1709, BS 476 Pt 20/21)","Seal with a compatible topcoat for colour, UV and chemical resistance"]);
+set("intumescent_epoxy","stainless_steel","ok","Used for stainless steel structural members in process environments requiring fire protection.",["Ensure correct primer is used","Apply by specialist applicator"]);
+set("intumescent_epoxy","aluminum","warn","Not a typical application for aluminium.",["Consult fire engineer"]);
+set("intumescent_epoxy","concrete","ok","Specialist epoxy intumescent coatings can be used for concrete spalling protection in hydrocarbon fire scenarios.",["Use products specifically tested for concrete hydrocarbon fire protection","Applied by specialist contractors"]);
+set("intumescent_epoxy","galvanized_steel","warn","Not typical for galvanised steel. Epoxy intumescent is usually specified for critical structural steel in severe environments.",["Confirm with manufacturer if galvanised substrate is acceptable"]);
+set("intumescent_epoxy","wood","bad","Epoxy intumescent coatings are for steel/concrete substrates only.",["Use water-based timber intumescent products for wood"]);
+set("intumescent_epoxy","treated_wood","bad","Not applicable.",["Use water-based timber intumescent products"]);
+set("intumescent_epoxy","brick","bad","Not applicable to masonry.",["Masonry has inherent fire resistance"]);
+set("intumescent_epoxy","stone","bad","Not applicable.",["Stone has inherent fire resistance"]);
+set("intumescent_epoxy","glass","bad","Not applicable.",["Use fire-rated glazing systems"]);
+set("intumescent_epoxy","gypsum","bad","Not applicable.",["Use fire-rated gypsum board specification"]);
+set("intumescent_epoxy","pvc","bad","Not applicable.",["Use fire-rated enclosures or intumescent strips"]);
+set("intumescent_epoxy","fiberglass","warn","Some specialist coatings exist for FRP pipe and vessel protection in process facilities.",["Confirm with manufacturer for FRP applications"]);
+set("intumescent_epoxy","asphalt","bad","Not applicable.",[]);
+set("intumescent_epoxy","copper","bad","Not applicable.",[]);
+set("intumescent_epoxy","zinc","bad","Not a standard application.",[]);
+
+// === WATERPROOFING ↔ SUBSTRATES ===
+set("bitumen_torch","concrete","ok","The most common application for torch-on bituminous membrane. Widely used on flat concrete roofs, basements, podiums and bridges.",["Concrete must be cured (minimum 4 weeks), dry and structurally sound","Apply a bituminous primer and allow to dry before torching","Install with minimum 100mm overlap at side and end laps","Ensure all detailing (upstands, outlets, corners) is fully executed"]);
+set("bitumen_torch","brick","ok","Compatible. Used on brick parapet walls, copings and below-DPC details.",["Apply bituminous primer to brick surface","Flash all copings and upstands with membrane upstand minimum 150mm"]);
+set("bitumen_torch","stone","ok","Compatible. Used for waterproofing stone podiums, terraces and planted decks.",["Apply bituminous primer","Ensure stone is dry and free of dust and organic growth"]);
+set("bitumen_torch","steel","ok","Compatible. Used over metal roof decking with a compatible vapour control layer.",["Apply bituminous primer to clean steel","Use a glass-fibre based membrane to minimise thermal movement cracking"]);
+set("bitumen_torch","fiberglass","ok","Compatible. Bituminous membrane can be torched onto GRP/FRP deck panels.",["Apply bituminous primer to GRP surface","Use modified bitumen (SBS or APP) membrane for flexibility"]);
+set("bitumen_torch","asphalt","ok","Compatible. Torch-on membrane is used as a waterproofing layer over mastic asphalt or as an overlay on aged asphalt.",["Ensure asphalt is sound and flat","Apply bituminous primer"]);
+set("bitumen_torch","wood","warn","Direct torching onto wood is a fire risk during installation. Cold-applied self-adhesive membranes are preferred for timber.",["Use a cold-applied self-adhesive bituminous membrane on timber","If torch-on is specified, take strict fire precautions during torching"]);
+set("bitumen_torch","treated_wood","warn","Same fire risk considerations as untreated wood during torch application.",["Prefer self-adhesive bituminous membranes on treated wood","Take strict fire precautions if torch-on is specified"]);
+set("bitumen_torch","aluminum","warn","High heat from torching can warp or damage thin aluminium deck panels.",["Use a cold-applied or self-adhesive bituminous membrane on aluminium"]);
+set("bitumen_torch","gypsum","bad","Not suitable. Gypsum is not a suitable structural waterproofing substrate.",["Gypsum board is not a waterproofing substrate"]);
+set("bitumen_torch","glass","bad","Not suitable for glass substrates.",["Use specialist glass sealants"]);
+set("bitumen_torch","pvc","bad","Bitumen is chemically incompatible with most PVC formulations. Bitumen plasticisers migrate into PVC and cause degradation.",["NEVER apply torch-on bituminous membrane directly to PVC","Use isolation layers if both materials must be in contact"]);
+set("bitumen_torch","copper","warn","Bitumen and copper are generally compatible but copper flashing must be primed.",["Apply bituminous primer to copper before membrane overlap"]);
+set("bitumen_torch","zinc","warn","Compatible with priming. Zinc surfaces must be primed before application.",["Apply bituminous primer to zinc","Ensure surface is clean and free of white rust"]);
+set("bitumen_torch","galvanized_steel","ok","Compatible with bituminous primer applied first. Used on galvanised roof decking and drainage channels.",["Apply bituminous primer to galvanised surface"]);
+set("bitumen_selfadh","concrete","ok","Excellent compatibility. Self-adhesive bituminous membranes are widely used for below-grade concrete waterproofing, bridge decks and flat roofs.",["Concrete must be smooth, dry and free of contaminants","Apply a compatible primer (e.g. Grace Preprufe primer) and allow to dry","Press firmly with roller to ensure full adhesion","Overlap all laps by minimum 75mm and heat-seal edges"]);
+set("bitumen_selfadh","steel","ok","Compatible. Used over steel roof decks and bridges.",["Apply bituminous primer to clean steel","Press firmly and ensure all laps are sealed"]);
+set("bitumen_selfadh","aluminum","ok","Compatible and preferred over torch-on for aluminium as there is no heat risk.",["Apply bituminous primer to aluminium","Press firmly for full contact adhesion"]);
+set("bitumen_selfadh","wood","ok","Compatible and preferred over torch-on for timber decks. Suitable for timber-framed flat roof construction.",["Apply bituminous primer to clean, dry, sound timber","Seal all knots and resinous areas before priming"]);
+set("bitumen_selfadh","treated_wood","ok","Compatible with treated timber substrates.",["Apply bituminous primer","Allow primer to dry fully before membrane installation"]);
+set("bitumen_selfadh","brick","ok","Compatible. Used for below-grade masonry waterproofing and rising damp applications.",["Apply bituminous primer","Ensure surface is dry and pointed"]);
+set("bitumen_selfadh","stone","ok","Compatible. Used for below-grade stone foundation waterproofing.",["Apply bituminous primer","Ensure stone is clean, dry and sound"]);
+set("bitumen_selfadh","galvanized_steel","ok","Compatible. Used over galvanised decking and drainage channels.",["Apply bituminous primer to galvanised surface"]);
+set("bitumen_selfadh","fiberglass","ok","Compatible. Can be applied over GRP/FRP panels.",["Apply bituminous primer to GRP surface"]);
+set("bitumen_selfadh","gypsum","warn","Not typically a suitable substrate for waterproofing. Gypsum board can absorb moisture.",["Not suitable for external or immersed applications"]);
+set("bitumen_selfadh","pvc","bad","Bitumen is chemically incompatible with PVC.",["Do not apply to PVC substrates"]);
+set("bitumen_selfadh","glass","bad","Not suitable for glass.",["Use specialist glass sealants"]);
+set("bitumen_selfadh","asphalt","ok","Compatible. Can be used to waterproof existing asphalt surfaces.",["Ensure asphalt is sound and flat","Apply bituminous primer if required"]);
+set("bitumen_selfadh","copper","warn","Compatible with priming.",["Apply bituminous primer to copper"]);
+set("bitumen_selfadh","zinc","warn","Compatible with priming.",["Apply bituminous primer to zinc"]);
+set("liquid_pu","concrete","ok","One of the most common liquid-applied waterproofing systems for concrete roofs, balconies, terraces, bridge decks and podiums.",["Concrete must be fully cured (minimum 28 days), dry (max 5% MC) and sound","Repair all cracks and defects with epoxy or polyurethane repair mortar","Prime with manufacturer's recommended primer","Apply by brush, roller or squeegee in multiple coats to achieve specified DFT (typically 1.5–2.0mm)"]);
+set("liquid_pu","steel","ok","Compatible. Used for waterproofing metal roofs, steel bridge decks and ship decks.",["Apply over a compatible epoxy or zinc-rich primer to blast-cleaned steel","Apply PU membrane to manufacturer's specified DFT"]);
+set("liquid_pu","aluminum","ok","Compatible. Used for waterproofing aluminium balcony decks and roof panels.",["Apply over an etch primer or specialist aluminium primer"]);
+set("liquid_pu","galvanized_steel","ok","Compatible. Used for waterproofing galvanised metal roofing.",["Apply over an etch primer or epoxy mastic primer"]);
+set("liquid_pu","stainless_steel","ok","Compatible. Used in specialist applications on stainless steel.",["Apply over a compatible primer"]);
+set("liquid_pu","brick","ok","Compatible. Used to waterproof brick parapet walls, planters and podium edges.",["Prime with a penetrating epoxy or polyurethane primer"]);
+set("liquid_pu","stone","ok","Compatible. Used on stone terraces, fountain surrounds and water features.",["Prime with manufacturer's recommended primer"]);
+set("liquid_pu","wood","ok","Compatible. Used on timber balconies and decks.",["Ensure timber is dry (max 18% MC)","Apply primer and allow to dry before membrane application"]);
+set("liquid_pu","treated_wood","ok","Compatible with treated timber.",["Ensure timber is dry before application","Apply compatible primer"]);
+set("liquid_pu","fiberglass","ok","Compatible with GRP/FRP substrates.",["Abrade GRP surface before priming","Apply compatible primer before membrane"]);
+set("liquid_pu","asphalt","warn","Solvent-based PU primers can attack or soften asphalt. Use solvent-free or water-based primer variants.",["Use only water-based or solvent-free primer on asphalt","Confirm system compatibility with manufacturer"]);
+set("liquid_pu","gypsum","warn","Liquid PU can be used as a wet room liner over gypsum board in protected interior applications only.",["Use only in sheltered interior wet room applications","Apply glass fibre reinforcing mat at all joints"]);
+set("liquid_pu","glass","warn","Limited adhesion to glass. Specialist adhesion promoters required.",["Use specialist primer for glass substrates"]);
+set("liquid_pu","pvc","warn","Adhesion to PVC varies. Use a specialist primer.",["Test adhesion before full application"]);
+set("liquid_pu","copper","warn","Applicable with correct primer.",["Use a specialist metal primer for copper"]);
+set("liquid_pu","zinc","warn","Compatible with correct primer.",["Use etch or specialist primer for zinc surfaces"]);
+set("liquid_pmma","concrete","ok","PMMA liquid membranes are fast-curing (walkable in 1–2 hours) and excellent on concrete roofs, parking decks, balconies and sports courts.",["Concrete must be sound, dry (max 4% MC) and free of contaminants","Apply manufacturer's PMMA primer and allow to cure","Apply fleece layer embedded in first PMMA coat at all details","Apply to manufacturer's specified DFT in 2 coats"]);
+set("liquid_pmma","steel","ok","Excellent for steel roof decks. Fast cure is advantageous for weather-tightness.",["Apply over a compatible epoxy or zinc-rich primer"]);
+set("liquid_pmma","aluminum","ok","Compatible. Used on aluminium decking and roofing.",["Apply over etch primer or specialist aluminium primer"]);
+set("liquid_pmma","galvanized_steel","ok","Compatible. Used on galvanised metal decking.",["Apply over etch primer or epoxy mastic primer"]);
+set("liquid_pmma","wood","ok","Excellent compatibility with timber. PMMA is one of the best systems for timber balconies and decks.",["Ensure timber is dry (max 18% MC)","Apply PMMA primer","Embed reinforcing fleece at all joints"]);
+set("liquid_pmma","treated_wood","ok","Compatible with treated timber.",["Apply PMMA primer","Ensure timber is dry"]);
+set("liquid_pmma","brick","ok","Compatible. Used to waterproof brick parapet walls and planter details.",["Prime with PMMA primer","Apply glass fibre fleece at all internal corners"]);
+set("liquid_pmma","stone","ok","Compatible. Used on stone terraces and roofs.",["Prime with PMMA primer"]);
+set("liquid_pmma","fiberglass","ok","Excellent compatibility with GRP/FRP. PMMA bonds very well to fibreglass.",["Abrade GRP surface before application","Apply PMMA primer"]);
+set("liquid_pmma","asphalt","ok","Compatible. PMMA can be used to overlay and waterproof existing asphalt.",["Prime with PMMA primer","Ensure asphalt is sound and free of cracking"]);
+set("liquid_pmma","gypsum","warn","Not a typical structural waterproofing substrate.",["Use only in sheltered interior applications if specified"]);
+set("liquid_pmma","glass","ok","PMMA adhesives and sealants are widely used in structural glazing and glass bonding.",["Confirm specific product is suitable for glass glazing applications"]);
+set("liquid_pmma","pvc","warn","PMMA can attack certain PVC formulations. Compatibility testing is essential.",["Test compatibility with specific PVC formulation"]);
+set("liquid_pmma","copper","warn","Applicable with correct primer.",["Use a specialist metal primer for copper"]);
+set("liquid_pmma","zinc","warn","Compatible with correct primer.",["Use etch or specialist primer for zinc"]);
+set("liquid_pmma","stainless_steel","ok","Compatible with correct surface preparation and primer.",["Apply etch primer before applying PMMA"]);
+set("crystalline_wp","concrete","ok","Crystalline waterproofing is ideal for concrete. The crystalline compounds penetrate capillary pores and react with moisture and cement to form insoluble crystals that block water passage.",["Apply to saturated surface dry (SSD) concrete","Apply by brush or spray in 1–2 coats at manufacturer's specified rate","Can be applied to positive or negative side of concrete","Most effective on fresh or green concrete"]);
+set("crystalline_wp","brick","warn","Less effective on brick than on concrete. The reaction requires calcium silicate compounds present in cement.",["Verify product effectiveness with the specific brick type","A cementitious waterproofing slurry may be more appropriate"]);
+set("crystalline_wp","stone","warn","Effectiveness on natural stone is limited and depends on the mineral composition.",["Test on a small area before full application","Confirm with product manufacturer"]);
+set("crystalline_wp","steel","bad","Not applicable to steel or metal substrates. The chemical reaction requires a cementitious matrix.",["Crystalline WP is exclusively for cementitious substrates","Use an appropriate metal coating or membrane for steel"]);
+set("crystalline_wp","aluminum","bad","Not applicable to aluminium.",["Use appropriate metal coatings"]);
+set("crystalline_wp","galvanized_steel","bad","Not applicable to galvanised steel.",["Use appropriate metal coatings"]);
+set("crystalline_wp","stainless_steel","bad","Not applicable.",["Use appropriate metal coatings"]);
+set("crystalline_wp","copper","bad","Not applicable.",["Use appropriate metal coatings"]);
+set("crystalline_wp","zinc","bad","Not applicable.",["Use appropriate metal coatings"]);
+set("crystalline_wp","wood","bad","Not applicable to wood. Crystalline WP requires a cementitious matrix to react.",["Use bituminous or polyurethane waterproofing for timber"]);
+set("crystalline_wp","treated_wood","bad","Not applicable to treated wood.",["Use bituminous or polyurethane waterproofing"]);
+set("crystalline_wp","glass","bad","Not applicable to glass.",["Use specialist glass sealants"]);
+set("crystalline_wp","gypsum","bad","Not applicable to gypsum.",["Not a waterproofing substrate"]);
+set("crystalline_wp","pvc","bad","Not applicable to PVC.",["Use appropriate PVC waterproofing systems"]);
+set("crystalline_wp","fiberglass","bad","Not applicable to FRP/fibreglass.",["Use appropriate coatings for fibreglass"]);
+set("crystalline_wp","asphalt","bad","Not applicable to asphalt.",["Use bituminous or liquid membrane systems"]);
+set("bentonite_wp","concrete","ok","Bentonite waterproofing (GCL panels) are widely used for below-grade concrete waterproofing of basements, foundations and earth-retaining structures.",["Install with the bentonite face towards the concrete","Overlap panels by minimum 150–300mm","Install a protection board or drainage layer before backfilling","Bentonite must remain in contact with moist soil — not suitable for above-grade or dry conditions"]);
+set("bentonite_wp","brick","ok","Compatible for below-grade brick foundation waterproofing.",["Ensure brick surface is reasonably smooth","Install protection board on external face before backfilling"]);
+set("bentonite_wp","stone","ok","Compatible for below-grade stone foundation waterproofing.",["Install protection board on external face"]);
+set("bentonite_wp","steel","ok","Bentonite can be used against steel sheet piles and steel basement walls with a protection board.",["Ensure steel is in reasonable condition","Install protection board to prevent puncture"]);
+set("bentonite_wp","wood","warn","Bentonite panels can be used against timber grade beams in below-grade applications but wood rot risk must be managed.",["Only use treated timber in below-grade conditions","Install a protection board"]);
+set("bentonite_wp","treated_wood","warn","Compatible for below-grade applications with treated timber.",["Install a protection board","Ensure timber treatment is rated for ground contact"]);
+set("bentonite_wp","gypsum","bad","Exclusively for below-grade external applications. Gypsum board is not a suitable substrate.",["Not applicable"]);
+set("bentonite_wp","glass","bad","Not applicable to glass substrates.",["Not applicable"]);
+set("bentonite_wp","pvc","bad","Not applicable.",["Not applicable"]);
+set("bentonite_wp","fiberglass","warn","GCL panels can be installed against fibreglass tank walls in below-grade applications.",["Install with protection board","Confirm with GCL manufacturer"]);
+set("bentonite_wp","asphalt","warn","Not typically used with asphalt surfaces.",["Use a bituminous or PU membrane system"]);
+set("bentonite_wp","aluminum","bad","Not applicable to aluminium.",["Not applicable"]);
+set("bentonite_wp","copper","bad","Not applicable.",["Not applicable"]);
+set("bentonite_wp","zinc","bad","Not applicable.",["Not applicable"]);
+set("bentonite_wp","galvanized_steel","ok","Compatible for below-grade galvanised steel structure waterproofing.",["Install protection board"]);
+set("bentonite_wp","stainless_steel","ok","Compatible for below-grade stainless steel structure waterproofing.",["Install protection board"]);
+set("epdm_membrane","concrete","ok","EPDM is widely used on flat concrete roofs, car parks, basements and foundations. Can be fully adhered, mechanically fixed or ballasted.",["Prime concrete with a compatible EPDM adhesive primer","Ensure all upstands, outlets and perimeter details are fully adhered","Seams must be bonded with EPDM tape or cold-applied EPDM adhesive — no heat welding"]);
+set("epdm_membrane","steel","ok","Compatible. EPDM is used on metal standing seam roofs.",["Apply contact adhesive to both steel and EPDM"]);
+set("epdm_membrane","wood","ok","EPDM is commonly used on timber-framed flat roofs. One of the best membrane options for timber.",["Ensure timber deck is dry, smooth and free of sharp edges","Apply contact adhesive or use mechanically-fixed system"]);
+set("epdm_membrane","aluminum","ok","Compatible. Used over aluminium roof decks.",["Apply contact adhesive to aluminium"]);
+set("epdm_membrane","galvanized_steel","ok","Compatible. Used on galvanised metal decking.",["Apply contact adhesive to galvanised surface"]);
+set("epdm_membrane","brick","ok","Compatible. Used on brick parapet walls and upstands.",["Bond EPDM to brick surface with contact adhesive"]);
+set("epdm_membrane","stone","ok","Compatible. Used at parapet detailing and terrace edges.",["Bond with contact adhesive or use mechanically fixed system"]);
+set("epdm_membrane","fiberglass","ok","Compatible. EPDM can be adhered to GRP/FRP substrates.",["Apply contact adhesive to GRP surface"]);
+set("epdm_membrane","asphalt","warn","EPDM and asphalt are chemically incompatible. Asphalt plasticisers migrate into EPDM causing swelling.",["NEVER apply EPDM directly to asphalt without a separator layer","Use a glass-fibre separation mat or polyethylene film between EPDM and asphalt"]);
+set("epdm_membrane","pvc","bad","EPDM and PVC are chemically incompatible. PVC plasticisers migrate into EPDM causing degradation.",["Do not use EPDM and PVC membranes in contact"]);
+set("epdm_membrane","gypsum","bad","Gypsum board is not a suitable waterproofing substrate.",["Not applicable"]);
+set("epdm_membrane","glass","bad","Not applicable to glass.",["Not applicable"]);
+set("epdm_membrane","copper","warn","EPDM is generally compatible with copper flashing but use EPDM-specific adhesive.",["Use EPDM contact adhesive at copper flashing laps"]);
+set("epdm_membrane","zinc","warn","Compatible with appropriate adhesive.",["Use EPDM contact adhesive"]);
+set("epdm_membrane","treated_wood","ok","Compatible with treated timber substrates.",["Apply contact adhesive to timber","Ensure timber is dry"]);
+set("epdm_membrane","stainless_steel","ok","Compatible. Used on stainless steel drainage channels and roof elements.",["Apply EPDM contact adhesive to stainless surface"]);
+set("tpo_membrane","concrete","ok","TPO is a single-ply roofing membrane widely used on flat concrete roofs, car parks and podium decks. Seams are heat-welded providing a monolithic waterproof layer.",["Prime concrete with a compatible water-based primer","All seams and laps must be heat-welded with a hot-air gun","Upstands, outlets and penetrations must be fully detailed with TPO accessories"]);
+set("tpo_membrane","steel","ok","Compatible. TPO is widely used on metal roof decking, frequently mechanically-fixed.",["Install mechanically-fixed through the metal deck","All seams to be hot-air welded"]);
+set("tpo_membrane","wood","ok","Compatible. TPO can be used over timber roof decks.",["Ensure timber is smooth, dry and free of sharp protrusions","Heat-weld all seams"]);
+set("tpo_membrane","aluminum","ok","Compatible. Used over aluminium roof and wall panels.",["Apply with compatible primer and contact adhesive or mechanical fixing"]);
+set("tpo_membrane","galvanized_steel","ok","Compatible. Used over galvanised metal decking.",["Mechanically fix or fully adhere with compatible adhesive"]);
+set("tpo_membrane","brick","ok","Compatible. Used at brick parapet walls and upstands.",["Bond TPO to brick with compatible adhesive","Heat-weld all laps"]);
+set("tpo_membrane","stone","ok","Compatible at parapet and upstand details.",["Bond with compatible adhesive"]);
+set("tpo_membrane","pvc","ok","TPO and PVC membranes are compatible and can be heat-welded together in some overlap details.",["Confirm compatibility between specific TPO and PVC products"]);
+set("tpo_membrane","fiberglass","ok","Compatible. TPO can be adhered to GRP/FRP substrates.",["Apply compatible primer and adhesive"]);
+set("tpo_membrane","asphalt","warn","Direct application of TPO over asphalt may cause compatibility issues. A separation layer is required.",["Install a polyester fleece or glass-fibre separation layer between TPO and asphalt"]);
+set("tpo_membrane","epdm_membrane","bad","TPO and EPDM membranes are chemically incompatible and cannot be heat-welded together.",["Do not mix TPO and EPDM in the same roof assembly","If patching EPDM, use EPDM patch material"]);
+set("tpo_membrane","gypsum","bad","Gypsum board is not a suitable waterproofing substrate.",["Not applicable"]);
+set("tpo_membrane","glass","bad","Not applicable.",["Not applicable"]);
+set("tpo_membrane","copper","warn","TPO is compatible with copper flashings but cannot be heat-welded to copper.",["Use TPO-coated metal coping instead","Bond with contact adhesive"]);
+set("tpo_membrane","zinc","warn","Compatible with zinc details. Use adhesive bonding rather than heat welding.",["Bond with compatible contact adhesive"]);
+set("tpo_membrane","treated_wood","ok","Compatible with treated timber.",["Ensure timber is dry and smooth"]);
+set("tpo_membrane","stainless_steel","ok","Compatible. TPO-coated stainless steel flashings are used as standard accessories.",["Use TPO-coated metal accessories and heat-weld to membrane"]);
+set("polyurea_spray","concrete","ok","Polyurea is an extremely fast-curing and durable waterproofing and protective coating for concrete in demanding applications such as tunnels, car parks, sewage structures and secondary containment.",["Concrete must be blast-cleaned and free of laitance, dust and oil","Prime with a specialist polyurea primer","Apply by specialist spray equipment (plural-component proportioner) — not suitable for hand application","Apply in a single pass to minimum 1.5–3.0mm DFT"]);
+set("polyurea_spray","steel","ok","Compatible. Used as a protective coating and waterproof liner on steel tanks, pipes, ship decks and offshore structures.",["Apply over a zinc-rich epoxy primer to blast-cleaned steel (Sa 2.5)","Apply by specialist spray equipment"]);
+set("polyurea_spray","aluminum","ok","Compatible. Used on aluminium surfaces in industrial and marine applications.",["Apply over etch primer and compatible epoxy primer"]);
+set("polyurea_spray","galvanized_steel","ok","Compatible. Can be used over galvanised steel.",["Apply over a compatible primer to degreased galvanised steel"]);
+set("polyurea_spray","stainless_steel","ok","Compatible. Used in specialist applications on stainless steel.",["Apply over a compatible primer"]);
+set("polyurea_spray","brick","ok","Compatible. Used for waterproofing and surface protection of brick structures such as tunnels and reservoirs.",["Apply over a compatible primer to clean, dry brick"]);
+set("polyurea_spray","stone","ok","Compatible. Used for waterproofing stone structures.",["Prime with compatible primer"]);
+set("polyurea_spray","wood","ok","Compatible. Used on timber in specialist applications.",["Apply over a compatible primer","Ensure timber is dry"]);
+set("polyurea_spray","treated_wood","ok","Compatible with treated timber.",["Apply over compatible primer"]);
+set("polyurea_spray","fiberglass","ok","Compatible. Polyurea is widely used on GRP/FRP structures.",["Apply over a compatible epoxy primer to abraded GRP surface"]);
+set("polyurea_spray","asphalt","ok","Compatible. Polyurea is used to reinforce and waterproof asphalt pavements and bridge decks.",["Prime with compatible primer","Apply by specialist equipment"]);
+set("polyurea_spray","pvc","warn","Adhesion to PVC varies. Test compatibility before committing.",["Use specialist adhesion promoters for PVC"]);
+set("polyurea_spray","gypsum","warn","Gypsum board is not a suitable substrate for polyurea in most applications.",["Use only in specialist interior applications if specified"]);
+set("polyurea_spray","glass","warn","Adhesion to glass is limited without specialist adhesion promoters.",["Use specialist glass primer"]);
+set("polyurea_spray","copper","warn","Compatible with correct primer.",["Apply specialist metal primer for copper"]);
+set("polyurea_spray","zinc","warn","Compatible with correct primer.",["Apply etch or specialist primer"]);
+set("cementitious_wp","concrete","ok","Cementitious waterproofing slurries are one of the most cost-effective systems for concrete waterproofing. Applied to concrete surfaces of foundations, basements, tanks and swimming pools.",["Substrate must be sound, clean and free of oil, paint and laitance","Wet the surface before application (saturated surface dry condition)","Apply by brush or trowel in 2 coats, alternating directions","Protect from frost and rapid drying for 24–48 hours"]);
+set("cementitious_wp","brick","ok","Suitable for brick and masonry surfaces.",["Dampen brick before application","Apply in 2 coats"]);
+set("cementitious_wp","stone","ok","Suitable for most natural stone masonry.",["Dampen stone before application","Confirm compatibility with specific stone type"]);
+set("cementitious_wp","steel","bad","Cementitious waterproofing slurries do not adhere to steel or metal substrates.",["Use metal-compatible coatings for steel waterproofing"]);
+set("cementitious_wp","aluminum","bad","Not applicable to aluminium.",["Use appropriate metal coatings"]);
+set("cementitious_wp","galvanized_steel","bad","Not applicable to galvanised steel.",["Use appropriate metal coatings"]);
+set("cementitious_wp","stainless_steel","bad","Not applicable to stainless steel.",["Use appropriate metal coatings"]);
+set("cementitious_wp","copper","bad","Not applicable to copper.",["Use appropriate metal coatings"]);
+set("cementitious_wp","zinc","bad","Not applicable to zinc.",["Use appropriate metal coatings"]);
+set("cementitious_wp","wood","bad","Not applicable to wood. Cementitious slurries are brittle and will crack as timber moves.",["Use polyurethane, PMMA or bituminous systems for timber"]);
+set("cementitious_wp","treated_wood","bad","Not applicable to treated wood.",["Use polyurethane, PMMA or bituminous systems"]);
+set("cementitious_wp","glass","bad","Not applicable to glass.",["Use specialist glass sealants"]);
+set("cementitious_wp","gypsum","warn","Not suitable for waterproofing gypsum board.",["Not suitable for waterproofing gypsum board","Use a specialist tile-backing board in wet area applications"]);
+set("cementitious_wp","pvc","bad","Not applicable to PVC.",["Not applicable"]);
+set("cementitious_wp","fiberglass","bad","Not applicable to FRP/fibreglass.",["Use liquid membrane or polyurea for fibreglass waterproofing"]);
+set("cementitious_wp","asphalt","bad","Not applicable to asphalt.",["Use bituminous or polyurethane systems"]);
+set("elastomeric_acrylic","concrete","ok","Elastomeric acrylic coatings are widely used on concrete facades, walls and parapets for crack-bridging, weatherproofing and decorative protection.",["Surface must be clean, dry and free of loose material","Apply acrylic primer first and allow to dry","Apply 2 coats at manufacturer's recommended coverage","Not designed for below-grade or immersed conditions"]);
+set("elastomeric_acrylic","brick","ok","Excellent compatibility with brick. Used to weatherproof brick facades while maintaining breathability.",["Remove all efflorescence and biological growth","Prime with acrylic primer","Apply 2 coats at manufacturer's recommended coverage"]);
+set("elastomeric_acrylic","stone","ok","Compatible with natural stone facades.",["Prime with acrylic primer","Ensure stone is clean, dry and free of algae"]);
+set("elastomeric_acrylic","gypsum","ok","Compatible for interior applications. Used as crack-bridging finish on gypsum and plasterboard.",["Prime with acrylic primer","Use interior-grade products for gypsum board applications"]);
+set("elastomeric_acrylic","wood","warn","Can be used on wood but may reduce breathability, leading to moisture entrapment.",["Ensure timber is fully dry before application","Consider microporous wood stains as a more breathable alternative"]);
+set("elastomeric_acrylic","treated_wood","warn","Same breathability considerations as untreated wood.",["Ensure timber is dry","Test compatibility with specific wood preservative"]);
+set("elastomeric_acrylic","steel","warn","Elastomeric acrylic provides minimal corrosion protection for steel.",["Use a zinc-rich primer and epoxy system for steel","Acrylic top-coats can be used as a finish over a corrosion-protective primer system"]);
+set("elastomeric_acrylic","aluminum","ok","Compatible as a finish coat over correctly primed aluminium.",["Ensure aluminium is primed with a compatible primer"]);
+set("elastomeric_acrylic","galvanized_steel","ok","Compatible as a finish coat over correctly primed galvanised steel.",["Apply etch primer and allow to dry before applying elastomeric topcoat"]);
+set("elastomeric_acrylic","pvc","warn","Adhesion to PVC is variable. Test before committing.",["Use a specialist PVC adhesion promoter"]);
+set("elastomeric_acrylic","fiberglass","ok","Compatible as a finish coat over GRP/FRP cladding panels.",["Abrade and prime GRP surface before applying elastomeric coat"]);
+set("elastomeric_acrylic","asphalt","warn","Not typically used over asphalt.",["Use bituminous or elastomeric bitumen coatings over asphalt"]);
+set("elastomeric_acrylic","glass","bad","Not suitable for glass substrates.",["Use specialist glass sealants"]);
+set("elastomeric_acrylic","copper","warn","Limited adhesion to copper.",["Confirm with manufacturer before use on copper"]);
+set("elastomeric_acrylic","zinc","warn","Some adhesion is possible but etch primer is recommended first.",["Apply etch or acrylic primer formulated for zinc surfaces"]);
+set("elastomeric_acrylic","stainless_steel","warn","Not typically used on stainless steel.",["Confirm with manufacturer before application"]);
+
+// === PRIMER ↔ PRIMER / PRIMER ↔ INTUMESCENT ===
+set("zinc_epoxy_primer","etch_primer","ok","Compatible. Etch primer is used on galvanised or aluminium substrates before a zinc-rich epoxy primer as an adhesion promoter.",["In most systems the zinc-rich primer goes direct to blast-cleaned steel","An etch primer may be used over galvanised or aluminium substrates"]);
+set("zinc_epoxy_primer","epoxy_mastic","ok","Standard multi-coat system. Zinc-rich epoxy as the first coat (cathodic protection), epoxy mastic as high-build intermediate or finish coat.",["Apply zinc-rich epoxy primer at 50–75 μm DFT","Overcoat with epoxy mastic within the manufacturer's recoat window"]);
+set("zinc_epoxy_primer","alkyd_primer","bad","Alkyd primers must never be applied over a zinc-rich epoxy primer. Alkyd systems are incompatible with epoxy chemistry and will cause delamination.",["Do not overcoat zinc-rich epoxy primer with alkyd products"]);
+set("zinc_epoxy_primer","acrylic_primer","warn","Acrylic primers are not typically used over zinc-rich epoxy primers.",["Do not use an acrylic primer as an intermediate over zinc-rich epoxy"]);
+set("zinc_epoxy_primer","intumescent_wb","ok","Standard fire protection system for structural steel. Zinc-rich epoxy primer first, then water-based intumescent, then a sealer/topcoat.",["Ensure the primer and intumescent product are from the same manufacturer's approved system","Apply at the DFT specified in the fire test evidence"]);
+set("zinc_epoxy_primer","intumescent_sb","ok","Standard fire protection system for structural steel in demanding environments.",["Ensure the system is approved and fire-test evidence covers the primer + intumescent combination","Apply at the DFT specified in the fire test evidence"]);
+set("zinc_epoxy_primer","intumescent_epoxy","ok","Used for heavy-duty epoxy intumescent systems (hydrocarbon fire protection). Zinc-rich epoxy primer forms the base.",["Apply zinc-rich primer to blast-cleaned steel (Sa 2.5)","Apply epoxy intumescent by specialist contractor to required DFT"]);
+set("etch_primer","epoxy_mastic","ok","Common system: etch primer on the metal substrate for adhesion, then epoxy mastic as the main protective layer.",["Apply etch primer as a thin adhesion coat","Overcoat with epoxy mastic within the manufacturer's stated window"]);
+set("etch_primer","alkyd_primer","warn","Etch primer can be overcoated with alkyd in some systems, but the etch primer must be thin and fully dry first.",["Apply thin etch primer coat and allow to dry fully","Test adhesion before committing to full alkyd overcoat"]);
+set("etch_primer","acrylic_primer","ok","Compatible in some systems. Etch primer as adhesion promotion, acrylic as the primer/undercoat layer.",["Apply thin etch primer coat and allow to dry","Overcoat with acrylic primer"]);
+set("etch_primer","intumescent_wb","ok","Etch primer is frequently used as an adhesion coat under water-based intumescent systems, particularly on galvanised or aluminium substrates.",["Confirm the system is covered by the manufacturer's fire test evidence"]);
+set("etch_primer","intumescent_sb","ok","Compatible. Etch primer used as an adhesion coat under solvent-based intumescent.",["Confirm the system is covered by fire test evidence"]);
+set("etch_primer","intumescent_epoxy","warn","Etch primer is not typically the primary primer in epoxy intumescent systems, which require a zinc-rich epoxy or epoxy mastic base.",["Use a zinc-rich epoxy primer as the primary base for epoxy intumescent systems"]);
+set("epoxy_mastic","alkyd_primer","bad","Alkyd primers must not be applied over epoxy mastic.",["Do not use alkyd products over epoxy mastic","Use epoxy or polyurethane topcoats over epoxy mastic"]);
+set("epoxy_mastic","acrylic_primer","warn","Acrylic coatings can be used as a topcoat over epoxy mastic in some light-duty exterior applications, but durability will be less than an epoxy or PU topcoat.",["Confirm with manufacturer"]);
+set("epoxy_mastic","intumescent_wb","warn","Epoxy mastic intermediate coats can sometimes interfere with intumescent performance depending on DFT and formulation. Always verify the full system is fire-test approved.",["Verify with the intumescent manufacturer that epoxy mastic is an approved undercoat"]);
+set("epoxy_mastic","intumescent_sb","warn","Same considerations as WB intumescent. Verify full system compatibility with the fire test evidence.",["Verify with the intumescent manufacturer"]);
+set("epoxy_mastic","intumescent_epoxy","ok","Compatible. Epoxy mastic can be used as a compatible primer/undercoat for epoxy intumescent coatings in some systems.",["Confirm with the epoxy intumescent manufacturer"]);
+set("alkyd_primer","acrylic_primer","warn","Acrylic topcoats can generally be applied over alkyd primers, but adhesion and compatibility should be tested.",["Allow alkyd primer to dry fully (minimum 24 hours)","Test adhesion before committing"]);
+set("alkyd_primer","intumescent_wb","bad","Alkyd primers must never be used under water-based intumescent coatings. The oils in the alkyd interfere with the intumescent's chemistry.",["Use only zinc-rich epoxy or etch primer under water-based intumescent","Never use alkyd-based primers in a fire protection system"]);
+set("alkyd_primer","intumescent_sb","warn","Some solvent-based intumescent products may tolerate an alkyd primer but this is not standard practice.",["Confirm with the intumescent manufacturer before using an alkyd primer"]);
+set("alkyd_primer","intumescent_epoxy","bad","Alkyd primers are not compatible with epoxy intumescent coatings.",["Use a zinc-rich epoxy primer as the base for epoxy intumescent systems"]);
+set("acrylic_primer","intumescent_wb","warn","Not a standard system. Acrylic primers are not typically used under intumescent coatings for steel.",["Use a zinc-rich epoxy primer or etch primer under steel intumescent systems"]);
+set("acrylic_primer","intumescent_sb","warn","Not a standard system for steel.",["Use a zinc-rich epoxy primer or etch primer under steel intumescent"]);
+set("acrylic_primer","intumescent_epoxy","bad","Acrylic primers are incompatible with epoxy intumescent coatings.",["Use a zinc-rich epoxy primer as the base for epoxy intumescent systems"]);
+set("acrylic_primer","elastomeric_acrylic","ok","Standard compatible system. Acrylic primer as the base coat on masonry, concrete or gypsum, then elastomeric acrylic as the topcoat.",["Apply acrylic primer and allow to dry","Apply elastomeric acrylic in 2 coats"]);
+set("intumescent_wb","intumescent_sb","warn","Water-based and solvent-based intumescent coatings are not typically applied within the same system layer.",["Only mix products within the same manufacturer's approved system","Always verify the combined DFT is covered by fire test evidence"]);
+set("intumescent_wb","intumescent_epoxy","bad","Thin-film water-based intumescent and epoxy intumescent are fundamentally different fire protection technologies.",["Do not mix thin-film and epoxy intumescent systems"]);
+set("intumescent_sb","intumescent_epoxy","bad","Thin-film solvent-based intumescent and epoxy intumescent are fundamentally different fire protection technologies.",["Do not mix thin-film and epoxy intumescent systems"]);
+
+// === WATERPROOFING ↔ WATERPROOFING ===
+set("bitumen_torch","bitumen_selfadh","ok","Highly compatible. Both are bituminous membranes and same chemistry. Self-adhesive membrane is commonly used at details and difficult-to-torch areas.",["Overlap self-adhesive to torch-on laps by minimum 100mm","Ensure all laps are fully bonded"]);
+set("bitumen_torch","liquid_pu","warn","Bituminous primer residues from torch-on can react with solvent-based polyurethane primers.",["Confirm compatibility between specific products","Use a water-based PU primer over bituminous surfaces"]);
+set("bitumen_torch","liquid_pmma","warn","Solvents in PMMA resins may attack bituminous membranes.",["Test compatibility between specific products","Confirm with manufacturer"]);
+set("bitumen_torch","epdm_membrane","bad","EPDM and bitumen are chemically incompatible. Bitumen plasticisers migrate into EPDM causing swelling, softening and adhesion failure.",["NEVER allow bituminous products to contact EPDM","Install a glass-fibre separation mat if both systems must be used in the same assembly"]);
+set("bitumen_torch","tpo_membrane","bad","TPO and bitumen are chemically incompatible. Bitumen plasticisers attack TPO membranes.",["Do not use bituminous and TPO membranes in direct contact"]);
+set("bitumen_torch","polyurea_spray","warn","Polyurea can be used as a topcoat over bituminous membranes in some applications but compatibility must be verified.",["Ensure bituminous membrane is fully cured and primed with a compatible primer before polyurea application"]);
+set("bitumen_torch","cementitious_wp","ok","Complementary systems. Cementitious waterproofing to the concrete substrate, then torch-on membrane over a screed or protective board.",["Apply cementitious WP to concrete structure","Allow to cure before installing torch-on membrane"]);
+set("bitumen_torch","crystalline_wp","warn","Can be used as complementary systems on concrete but are not overlaid directly on each other.",["Apply crystalline WP to the concrete substrate","Do not apply torch-on directly over crystalline slurry"]);
+set("bitumen_torch","bentonite_wp","bad","Fundamentally different waterproofing systems for different applications and substrates.",["Select one waterproofing system appropriate to the application"]);
+set("bitumen_torch","elastomeric_acrylic","warn","These serve different applications and are not used as part of the same waterproofing system.",["Use elastomeric acrylic for above-grade facades","Use bituminous membrane for flat roof/below-grade"]);
+set("bitumen_selfadh","liquid_pu","warn","Compatibility between self-adhesive bituminous and PU systems must be verified. Bituminous primer can interfere with PU adhesion.",["Use a water-based PU primer if overcoating a bituminous surface"]);
+set("bitumen_selfadh","liquid_pmma","warn","PMMA solvents may attack bituminous membranes.",["Confirm with manufacturer before applying PMMA over self-adhesive membrane"]);
+set("bitumen_selfadh","epdm_membrane","bad","Bituminous products and EPDM are chemically incompatible.",["Do not allow contact","Use a separation layer if necessary"]);
+set("bitumen_selfadh","tpo_membrane","bad","Bituminous products and TPO membranes are chemically incompatible.",["Do not allow direct contact"]);
+set("bitumen_selfadh","polyurea_spray","warn","Possible as an overcoat on cured bituminous membrane with a compatible primer.",["Ensure bituminous membrane is fully cured","Prime with a compatible primer before polyurea application"]);
+set("bitumen_selfadh","cementitious_wp","ok","Complementary systems. Cementitious waterproofing to the structural substrate, self-adhesive membrane as an additional layer.",["Allow cementitious WP to cure before installing membrane"]);
+set("bitumen_selfadh","crystalline_wp","warn","Can be used as complementary systems but not as overlapping coats.",["Apply crystalline WP to concrete substrate","Install membrane on a separate surface or after a protection screed"]);
+set("bitumen_selfadh","bentonite_wp","bad","Fundamentally different systems.",["Select one system based on the specific application"]);
+set("bitumen_selfadh","elastomeric_acrylic","warn","These serve different applications.",["Use elastomeric acrylic for above-grade facades"]);
+set("liquid_pu","liquid_pmma","warn","PU and PMMA use different chemistry. They should not be mixed within the same waterproofing layer.",["Do not mix PU and PMMA products in the same layer","Confirm with the manufacturer before using as an overcoat system"]);
+set("liquid_pu","epdm_membrane","warn","Liquid PU can be used as a detail adhesive or primer under EPDM in some assembly details, but as a membrane system they should be designed separately.",["Confirm specific product compatibility"]);
+set("liquid_pu","tpo_membrane","warn","Liquid PU can be used as a sealing layer at TPO details in some applications.",["Test compatibility between specific PU and TPO products"]);
+set("liquid_pu","polyurea_spray","warn","In some systems, PU is applied as a primer/base layer before polyurea.",["Confirm with the polyurea manufacturer that PU is a compatible primer substrate"]);
+set("liquid_pu","cementitious_wp","ok","Complementary systems. Cementitious waterproofing on the concrete substrate, then liquid PU as the primary waterproofing/wearing layer.",["Allow cementitious WP to cure fully before priming and applying liquid PU"]);
+set("liquid_pu","crystalline_wp","ok","Compatible as complementary systems. Crystalline WP provides integral concrete protection; liquid PU provides surface waterproofing.",["Apply crystalline WP first and allow to cure","Apply PU membrane primer and membrane over crystalline-treated concrete"]);
+set("liquid_pu","bentonite_wp","bad","Fundamentally different waterproofing systems.",["Select one system based on the specific application"]);
+set("liquid_pu","elastomeric_acrylic","warn","Elastomeric acrylic is not a waterproofing membrane. Acrylic can be used as a UV-stable decorative topcoat over a PU membrane in some systems.",["Confirm with manufacturer if acrylic topcoat is approved over the specific PU membrane"]);
+set("liquid_pmma","epdm_membrane","bad","PMMA solvents can attack EPDM membranes.",["Do not apply PMMA products to EPDM"]);
+set("liquid_pmma","tpo_membrane","bad","PMMA solvents can attack TPO membranes.",["Do not apply PMMA products to TPO"]);
+set("liquid_pmma","polyurea_spray","warn","A PMMA base under a polyurea topcoat is possible but is not standard practice.",["Confirm with both manufacturers before combining systems"]);
+set("liquid_pmma","cementitious_wp","ok","Complementary. Cementitious WP on the concrete substrate, then PMMA as the primary membrane.",["Allow cementitious WP to cure and apply PMMA system over"]);
+set("liquid_pmma","crystalline_wp","ok","Compatible as complementary systems. Crystalline provides integral protection; PMMA provides surface waterproofing.",["Allow crystalline WP to cure before applying PMMA system"]);
+set("liquid_pmma","bentonite_wp","bad","Fundamentally different systems.",["Select one system for the application"]);
+set("liquid_pmma","elastomeric_acrylic","warn","Different purpose systems. Elastomeric acrylic is not a waterproofing membrane.",["Do not substitute for waterproofing membrane"]);
+set("crystalline_wp","cementitious_wp","ok","Both are cementitious waterproofing systems. Crystalline WP is an integral treatment; cementitious slurry is a surface-applied coating. Can be used as complementary systems.",["Apply crystalline WP to fresh or green concrete for best results","Both systems require saturated surface dry concrete"]);
+set("crystalline_wp","bentonite_wp","warn","Both can be used in below-grade waterproofing but serve different purposes. Crystalline is integral to concrete; bentonite is an external membrane.",["Can be used as complementary systems in critical below-grade applications"]);
+set("crystalline_wp","epdm_membrane","warn","Different substrates and positions in construction. Can be used in the same building on different elements.",["Not as overlapping coats"]);
+set("crystalline_wp","tpo_membrane","warn","Different substrates and applications.",["Can be used in the same building on different elements"]);
+set("crystalline_wp","polyurea_spray","ok","Excellent combination for critical waterproofing. Crystalline WP treats the concrete integrally; polyurea provides a tough, fast-curing surface barrier.",["Apply crystalline WP to concrete first and allow to cure","Prime and apply polyurea over the crystalline-treated concrete"]);
+set("crystalline_wp","elastomeric_acrylic","warn","These serve different substrates and applications.",["Not typically used together in the same system"]);
+set("bentonite_wp","epdm_membrane","warn","Can be used in the same building on different elements. Bentonite at the external below-grade face; EPDM on the roof.",["Not overlapping systems"]);
+set("bentonite_wp","tpo_membrane","warn","Different applications. Can be used in the same building on different elements.",["Not overlapping systems"]);
+set("bentonite_wp","polyurea_spray","bad","Bentonite is an earth-contact system; polyurea is a spray-applied coating. They are not compatible as overlapping systems.",["Select one system for the application"]);
+set("bentonite_wp","cementitious_wp","warn","Can be used as complementary systems. Cementitious WP on the inner face; bentonite at the outer face.",["Confirm design with a waterproofing specialist"]);
+set("bentonite_wp","elastomeric_acrylic","bad","Fundamentally different applications.",["Bentonite is for below-grade earth-contact waterproofing only"]);
+set("epdm_membrane","polyurea_spray","warn","Polyurea can be used to seal EPDM seams and repairs in some specialist applications, but standard EPDM seam sealing uses EPDM adhesive tape.",["Use EPDM tape for standard seam sealing","Polyurea may be used for emergency repair — confirm with EPDM manufacturer"]);
+set("epdm_membrane","cementitious_wp","bad","EPDM is a surface-applied membrane for roofs; cementitious WP is for masonry substrates.",["Select the appropriate system for the substrate"]);
+set("epdm_membrane","elastomeric_acrylic","warn","Elastomeric acrylic coatings can be used as a UV-stable topcoat over EPDM in some maintenance applications.",["Use an EPDM-compatible acrylic topcoat specifically formulated for rubber membranes","Test adhesion before full application"]);
+set("tpo_membrane","polyurea_spray","warn","Polyurea can be used to seal TPO seams and repairs in specialist applications, but standard TPO seam sealing requires hot-air welding.",["Use hot-air welding for all standard TPO seams"]);
+set("tpo_membrane","cementitious_wp","bad","TPO is a surface-applied membrane; cementitious WP is for masonry substrates.",["Select the appropriate system for the substrate"]);
+set("tpo_membrane","elastomeric_acrylic","warn","Acrylic coatings can be applied over TPO as a UV-reflective or maintenance topcoat in some systems.",["Use only products formulated for TPO substrates","Test adhesion before full application"]);
+set("polyurea_spray","cementitious_wp","warn","Cementitious WP on masonry substrate; polyurea as a surface membrane. Not typically overlapping.",["Polyurea can be applied over cementitious WP if used as a base prep coat — confirm with manufacturer"]);
+set("polyurea_spray","elastomeric_acrylic","warn","Elastomeric acrylic can be used as a UV-stable topcoat over a cured polyurea coating in some exterior applications.",["Use only products formulated for application over polyurea","Test adhesion before full application"]);
+set("cementitious_wp","elastomeric_acrylic","ok","Complementary systems. Cementitious waterproofing on the masonry substrate; elastomeric acrylic as a weather-resistant, crack-bridging decorative topcoat.",["Allow cementitious WP to cure fully","Prime with acrylic primer before applying elastomeric topcoat"]);
+
+const { useState, useMemo } = React;
+
+const STATUS_CONFIG = {
+  ok:    { label: "Compatible",      color: "#166534", bg: "#dcfce7", border: "#86efac", icon: "ti-circle-check"   },
+  warn:  { label: "Conditional",     color: "#92600a", bg: "#fef3cd", border: "#f59e0b", icon: "ti-alert-triangle" },
+  bad:   { label: "Incompatible",    color: "#991b1b", bg: "#fee2e2", border: "#fca5a5", icon: "ti-circle-x"       },
+  same:  { label: "Same Material",   color: "#6b7280", bg: "#f3f4f6", border: "#e5e7eb", icon: "ti-equal"          },
+  check: { label: "Verify Required", color: "#6b7280", bg: "#f3f4f6", border: "#d1d5db", icon: "ti-help-circle"    },
+};
+const CATEGORIES = ["All", ...Array.from(new Set(MATERIALS.map(m => m.category)))];
+function getCompat(a, b) {
+  if (a === b) return { status: "same", notes: "Same material selected.", conditions: [] };
+  const key = [a, b].sort().join("|");
+  return COMPAT[key] || { status: "check", notes: "No specific compatibility data available. Consult both material datasheets and a qualified engineer.", conditions: ["Review both material datasheets", "Consult a qualified engineer", "Contact manufacturer technical support"] };
+}
+
+// ─── WORKER URL ───────────────────────────────────────────────────────────────
+// After deploying your Cloudflare Worker, paste its URL here:
+const WORKER_URL = "https://YOUR-WORKER-NAME.YOUR-ACCOUNT.workers.dev/check";
+// e.g. "https://material-compat.myaccount.workers.dev/check"
+
+// ─── Product Search (calls Worker, no API key needed from user) ───────────────
+function ProductSearch() {
+  const [prodA, setProdA] = useState("");
+  const [prodB, setProdB] = useState("");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const workerConfigured = !WORKER_URL.includes("YOUR-WORKER-NAME");
+
+  const materialList = MATERIALS.map(m =>
+    `${m.id} | ${m.label} | ${m.category}${m.brands.length ? " | e.g. " + m.brands.slice(0,3).join(", ") : ""}`
+  ).join("\n");
+
+  async function analyse() {
+    const a = prodA.trim();
+    const b = prodB.trim();
+    if (!a || !b) { setError("Please enter both product names."); return; }
+    if (!workerConfigured) { setError("Worker URL not configured. See setup instructions."); return; }
+    setError(""); setResult(null); setLoading(true);
+    try {
+      const resp = await fetch(WORKER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productA: a, productB: b, materialList }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      setResult(data);
+    } catch(e) {
+      setError(e.message || "Request failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const cfg = result ? (STATUS_CONFIG[result.compatibility?.status] || STATUS_CONFIG.check) : null;
+
+  return (
+    <div>
+      {/* Setup notice if worker not configured */}
+      {!workerConfigured && (
+        <div style={{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:10,padding:"14px 18px",marginBottom:18,display:"flex",gap:12,alignItems:"flex-start"}}>
+          <i className="ti ti-settings" style={{fontSize:20,color:"#c2410c",flexShrink:0,marginTop:2}} />
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#9a3412",marginBottom:4}}>Worker not yet configured</div>
+            <div style={{fontSize:12,color:"#c2410c",lineHeight:1.6}}>
+              Deploy <code style={{background:"#fee0c0",padding:"1px 5px",borderRadius:4}}>worker.js</code> to Cloudflare Workers,
+              then replace <code style={{background:"#fee0c0",padding:"1px 5px",borderRadius:4}}>YOUR-WORKER-NAME</code> in
+              the <code style={{background:"#fee0c0",padding:"1px 5px",borderRadius:4}}>WORKER_URL</code> constant at the top of this file with your worker's URL.
+              See the included <strong>SETUP.md</strong> for step-by-step instructions.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info banner */}
+      <div style={{background:"#f0f4ff",border:"1px solid #c7d2fe",borderRadius:10,padding:"12px 16px",marginBottom:18,fontSize:13,color:"#3730a3",display:"flex",gap:10,alignItems:"flex-start"}}>
+        <i className="ti ti-sparkles" style={{fontSize:18,flexShrink:0,marginTop:1}} />
+        <div>
+          <strong>AI-powered product lookup.</strong> Type any specific product by trade name, grade or manufacturer.
+          The AI identifies it, classifies it and gives an expert compatibility assessment — no login required.
+        </div>
+      </div>
+
+      {/* Inputs */}
+      <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:16,alignItems:"flex-end"}}>
+        <div style={{flex:1,minWidth:220}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#9ca3af",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:6}}>Product A</div>
+          <input value={prodA} onChange={e=>setProdA(e.target.value)} onKeyDown={e=>e.key==="Enter"&&analyse()} placeholder="e.g. Carbocoat 115" style={{fontSize:14,padding:"10px 14px",borderRadius:8}} />
+        </div>
+        <div style={{fontSize:20,color:"#9ca3af",marginBottom:8,flexShrink:0}}>+</div>
+        <div style={{flex:1,minWidth:220}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#9ca3af",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:6}}>Product B</div>
+          <input value={prodB} onChange={e=>setProdB(e.target.value)} onKeyDown={e=>e.key==="Enter"&&analyse()} placeholder="e.g. Isolatek Type WB 4" style={{fontSize:14,padding:"10px 14px",borderRadius:8}} />
+        </div>
+        <button onClick={analyse} disabled={loading||!workerConfigured}
+          style={{padding:"10px 22px",background:workerConfigured?"#6366f1":"#9ca3af",color:"#fff",border:"none",borderRadius:8,fontWeight:700,fontSize:14,flexShrink:0,display:"flex",alignItems:"center",gap:8,minWidth:170,justifyContent:"center"}}>
+          {loading ? <><span className="btn-spinner"/>Analysing…</> : <><i className="ti ti-search" style={{fontSize:15}}/>Check Compatibility</>}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{background:"#fee2e2",border:"1px solid #fca5a5",borderRadius:8,padding:"10px 14px",fontSize:13,color:"#991b1b",marginBottom:14,display:"flex",gap:8,alignItems:"flex-start"}}>
+          <i className="ti ti-alert-circle" style={{fontSize:16,flexShrink:0,marginTop:1}}/><span>{error}</span>
+        </div>
+      )}
+
+      {/* Example searches */}
+      {!result && !loading && (
+        <div>
+          <div style={{fontSize:12,color:"#9ca3af",marginBottom:8}}>Try an example:</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {[
+              ["Carbocoat 115","Isolatek Type WB 4"],
+              ["Chartek 7","Jotun Barrier 90"],
+              ["Grace Bituthene 3000","Firestone RubberGard EPDM"],
+              ["Kemperol AC","concrete substrate"],
+              ["Xypex Concentrate","Sika-1"],
+              ["Sherwin-Williams Macropoxy 646","structural steel"],
+            ].map(([a,b])=>(
+              <button key={a+b} onClick={()=>{setProdA(a);setProdB(b);}}
+                style={{fontSize:12,padding:"4px 10px",borderRadius:6,background:"#f3f4f6",border:"1px solid #e5e7eb",color:"#374151"}}>
+                {a} + {b}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Result */}
+      {result && cfg && (
+        <div style={{background:"#fff",border:`1.5px solid ${cfg.border}`,borderRadius:12,overflow:"hidden",marginTop:12}}>
+          <div style={{background:cfg.bg,padding:"16px 20px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+            <i className={`ti ${cfg.icon}`} style={{fontSize:28,color:cfg.color,flexShrink:0}}/>
+            <div style={{flex:1,minWidth:200}}>
+              <div style={{fontSize:11,fontWeight:700,color:cfg.color,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:2}}>{cfg.label}</div>
+              <div style={{fontSize:16,fontWeight:700,color:"#111827"}}>{result.productA.name} <span style={{color:"#9ca3af",fontWeight:400}}>+</span> {result.productB.name}</div>
+            </div>
+            <div style={{textAlign:"right",flexShrink:0}}>
+              <div style={{fontSize:11,color:cfg.color,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.08em"}}>{result.compatibility.confidence} confidence</div>
+              <div style={{fontSize:11,color:"#6b7280",marginTop:2,maxWidth:180,lineHeight:1.35}}>{result.compatibility.confidenceReason}</div>
+            </div>
+          </div>
+
+          <div style={{padding:"18px 20px",display:"flex",flexDirection:"column",gap:16}}>
+            {/* Product cards */}
+            <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+              {[result.productA,result.productB].map((p,i)=>(
+                <div key={i} style={{flex:"1 1 220px",background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:8,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#9ca3af",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:4}}>Product {i===0?"A":"B"}</div>
+                  <div style={{fontSize:15,fontWeight:700,color:"#111827",marginBottom:4}}>{p.name}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+                    <span style={{fontSize:11,background:"#e0e7ff",color:"#3730a3",borderRadius:4,padding:"2px 7px",fontWeight:600}}>{p.category}</span>
+                    <span style={{fontSize:11,color:"#6b7280"}}>→ {p.matchedLabel}</span>
+                  </div>
+                  <div style={{fontSize:12,color:"#4b5563",lineHeight:1.6}}>{p.productNotes}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Expert assessment */}
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:"#9ca3af",letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:8}}>Expert Assessment</div>
+              <p style={{fontSize:14,color:"#374151",lineHeight:1.7,margin:0}}>{result.compatibility.summary}</p>
+            </div>
+
+            {/* Conditions */}
+            {result.compatibility.conditions?.length>0&&(
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:"#9ca3af",letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:8}}>
+                  {result.compatibility.status==="bad"?"⛔ Required precautions":"⚠ Conditions & requirements"}
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                  {result.compatibility.conditions.map((c,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 12px",background:"#f3f4f6",borderRadius:8,fontSize:13,color:"#1f2937"}}>
+                      <i className={`ti ${result.compatibility.status==="bad"?"ti-alert-circle":"ti-point"}`} style={{fontSize:14,color:cfg.color,flexShrink:0,marginTop:1}}/>
+                      {c}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Reference standard */}
+            {result.compatibility.referenceStandard&&(
+              <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#92400e",display:"flex",gap:8,alignItems:"flex-start"}}>
+                <i className="ti ti-clipboard-list" style={{fontSize:14,flexShrink:0,marginTop:1}}/>
+                <div><strong>Reference standard:</strong> {result.compatibility.referenceStandard}</div>
+              </div>
+            )}
+
+            {/* DB cross-ref */}
+            {(()=>{
+              const dbResult=getCompat(result.productA.matchedId,result.productB.matchedId);
+              const dbCfg=STATUS_CONFIG[dbResult.status];
+              return(
+                <div style={{background:"#f8faff",border:"1px solid #c7d2fe",borderRadius:8,padding:"12px 14px"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#3730a3",letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:8}}>
+                    <i className="ti ti-database" style={{fontSize:12,marginRight:5}}/>Database cross-reference
+                  </div>
+                  <div style={{fontSize:12,color:"#374151",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                    <i className={`ti ${dbCfg.icon}`} style={{color:dbCfg.color,fontSize:14}}/>
+                    <span>{result.productA.matchedLabel} + {result.productB.matchedLabel} → <strong style={{color:dbCfg.color}}>{dbCfg.label}</strong></span>
+                  </div>
+                  {dbResult.notes&&<p style={{fontSize:12,color:"#6b7280",marginTop:6,marginBottom:0,lineHeight:1.55}}>{dbResult.notes}</p>}
+                </div>
+              );
+            })()}
+
+            <div style={{display:"flex",justifyContent:"flex-end"}}>
+              <button onClick={()=>{setResult(null);setProdA("");setProdB("");}} style={{fontSize:12,padding:"6px 14px",borderRadius:6}}>
+                <i className="ti ti-refresh" style={{fontSize:12,marginRight:5}}/>Clear & search again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Dropdown ─────────────────────────────────────────────────────────────────
+function Dropdown({value,setValue,search,setSearch,options,open,setOpen,label}){
+  const selected=MATERIALS.find(m=>m.id===value);
+  const grouped={};
+  options.forEach(m=>{if(!grouped[m.category])grouped[m.category]=[];grouped[m.category].push(m);});
+  return(
+    <div style={{position:"relative",flex:1,minWidth:200}} data-dropdown>
+      <div style={{fontSize:11,fontWeight:700,color:"#9ca3af",marginBottom:6,letterSpacing:"0.08em",textTransform:"uppercase"}}>{label}</div>
+      <div onClick={()=>setOpen(!open)} style={{background:"#fff",border:"0.5px solid #d1d5db",borderRadius:8,padding:"10px 14px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,overflow:"hidden"}}>
+          <i className={`ti ${selected?.icon}`} style={{fontSize:18,color:"#6b7280",flexShrink:0}}/>
+          <div style={{overflow:"hidden"}}>
+            <div style={{fontSize:14,fontWeight:600,color:"#111827",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{selected?.label}</div>
+            <div style={{fontSize:11,color:"#9ca3af"}}>{selected?.category}</div>
+          </div>
+        </div>
+        <i className="ti ti-chevron-down" style={{fontSize:14,color:"#9ca3af",flexShrink:0,transition:"transform 0.2s",transform:open?"rotate(180deg)":"none"}}/>
+      </div>
+      {open&&(
+        <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,zIndex:200,background:"#fff",border:"0.5px solid #d1d5db",borderRadius:12,boxShadow:"0 8px 24px rgba(0,0,0,0.13)",overflow:"hidden",maxHeight:320,display:"flex",flexDirection:"column"}}>
+          <div style={{padding:"8px 10px",borderBottom:"0.5px solid #e5e7eb"}}>
+            <input autoFocus value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search materials…" style={{fontSize:13}}/>
+          </div>
+          <div style={{overflowY:"auto",flex:1}}>
+            {Object.entries(grouped).map(([cat,items])=>(
+              <div key={cat}>
+                <div style={{padding:"5px 14px 2px",fontSize:10,fontWeight:700,color:"#9ca3af",letterSpacing:"0.09em",textTransform:"uppercase",background:"#f9fafb"}}>{cat}</div>
+                {items.map(m=>(
+                  <div key={m.id} onClick={()=>{setValue(m.id);setSearch("");setOpen(false);}}
+                    style={{padding:"7px 14px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",background:m.id===value?"#f3f4f6":"transparent"}}
+                    onMouseEnter={e=>{if(m.id!==value)e.currentTarget.style.background="#f3f4f6";}}
+                    onMouseLeave={e=>{if(m.id!==value)e.currentTarget.style.background="transparent";}}>
+                    <i className={`ti ${m.icon}`} style={{fontSize:15,color:"#6b7280",flexShrink:0}}/>
+                    <span style={{fontSize:13,fontWeight:m.id===value?600:400,color:"#111827"}}>{m.label}</span>
+                    {m.id===value&&<i className="ti ti-check" style={{fontSize:13,color:"#166534",marginLeft:"auto"}}/>}
+                  </div>
+                ))}
+              </div>
+            ))}
+            {options.length===0&&<div style={{padding:"12px 14px",fontSize:13,color:"#9ca3af"}}>No results</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MatrixCell ───────────────────────────────────────────────────────────────
+function MatrixCell({a,b,onSelect}){
+  if(a===b)return<div style={{width:28,height:28,background:"#f3f4f6",borderRadius:3}}/>;
+  const r=getCompat(a,b);const c=STATUS_CONFIG[r.status];
+  return(
+    <div title={`${MATERIALS.find(m=>m.id===a)?.label} + ${MATERIALS.find(m=>m.id===b)?.label}: ${c.label}`}
+      onClick={()=>onSelect(a,b)}
+      style={{width:28,height:28,background:c.bg,border:`1px solid ${c.border}`,borderRadius:3,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"transform 0.12s"}}
+      onMouseEnter={e=>e.currentTarget.style.transform="scale(1.3)"}
+      onMouseLeave={e=>e.currentTarget.style.transform="scale(1)"}>
+      <i className={`ti ${c.icon}`} style={{fontSize:11,color:c.color}}/>
+    </div>
+  );
+}
+
+// ─── Category Lookup ──────────────────────────────────────────────────────────
+function CategoryLookup(){
+  const [matA,setMatA]=useState("steel");
+  const [matB,setMatB]=useState("intumescent_wb");
+  const [view,setView]=useState("lookup");
+  const [searchA,setSearchA]=useState("");
+  const [searchB,setSearchB]=useState("");
+  const [filter,setFilter]=useState("All");
+  const [openA,setOpenA]=useState(false);
+  const [openB,setOpenB]=useState(false);
+  const result=useMemo(()=>getCompat(matA,matB),[matA,matB]);
+  const cfg=STATUS_CONFIG[result.status];
+  const matAObj=MATERIALS.find(m=>m.id===matA);
+  const matBObj=MATERIALS.find(m=>m.id===matB);
+  const filteredA=MATERIALS.filter(m=>m.label.toLowerCase().includes(searchA.toLowerCase())&&(filter==="All"||m.category===filter));
+  const filteredB=MATERIALS.filter(m=>m.label.toLowerCase().includes(searchB.toLowerCase())&&(filter==="All"||m.category===filter));
+  const matrixMaterials=filter==="All"?MATERIALS:MATERIALS.filter(m=>m.category===filter);
+  const SUGGESTED=[["steel","zinc_epoxy_primer"],["steel","intumescent_wb"],["concrete","crystalline_wp"],["concrete","liquid_pu"],["bitumen_torch","epdm_membrane"],["alkyd_primer","galvanized_steel"],["treated_wood","aluminum"],["tpo_membrane","pvc"]];
+  return(
+    <div onClick={e=>{if(!e.target.closest("[data-dropdown]")){setOpenA(false);setOpenB(false);}}}>
+      <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+        {["lookup","matrix"].map(v=>(
+          <button key={v} onClick={()=>setView(v)} style={{fontSize:13,padding:"6px 14px",background:view===v?"#e0e7ff":"transparent",color:view===v?"#3730a3":"#374151",fontWeight:view===v?600:400,border:view===v?"1px solid #c7d2fe":"1px solid transparent",borderRadius:8}}>
+            <i className={`ti ${v==="lookup"?"ti-search":"ti-table"}`} style={{fontSize:13,verticalAlign:-2,marginRight:5}}/>{v.charAt(0).toUpperCase()+v.slice(1)}
+          </button>
+        ))}
+        <div style={{marginLeft:"auto",display:"flex",gap:5,flexWrap:"wrap"}}>
+          {CATEGORIES.map(cat=>(
+            <button key={cat} onClick={()=>setFilter(cat)} style={{fontSize:12,padding:"4px 10px",background:filter===cat?"#f3f4f6":"transparent",fontWeight:filter===cat?600:400,borderRadius:6,border:filter===cat?"1px solid #d1d5db":"1px solid transparent"}}>{cat}</button>
+          ))}
+        </div>
+      </div>
+      {view==="lookup"&&(
+        <>
+          <div style={{display:"flex",gap:10,alignItems:"flex-end",marginBottom:16,flexWrap:"wrap"}}>
+            <Dropdown value={matA} setValue={setMatA} search={searchA} setSearch={setSearchA} options={filteredA} open={openA} setOpen={v=>{setOpenA(v);if(v)setOpenB(false);}} label="Material A"/>
+            <button onClick={()=>{const t=matA;setMatA(matB);setMatB(t);}} title="Swap" style={{padding:"10px 12px",flexShrink:0}}><i className="ti ti-arrows-exchange" style={{fontSize:18}}/></button>
+            <Dropdown value={matB} setValue={setMatB} search={searchB} setSearch={setSearchB} options={filteredB} open={openB} setOpen={v=>{setOpenB(v);if(v)setOpenA(false);}} label="Material B"/>
+          </div>
+          <div style={{background:"#fff",border:`1.5px solid ${cfg.border}`,borderRadius:12,overflow:"hidden"}}>
+            <div style={{background:cfg.bg,padding:"14px 20px",display:"flex",alignItems:"center",gap:12}}>
+              <i className={`ti ${cfg.icon}`} style={{fontSize:26,color:cfg.color,flexShrink:0}}/>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:cfg.color,letterSpacing:"0.09em",textTransform:"uppercase"}}>{cfg.label}</div>
+                <div style={{fontSize:15,fontWeight:700,color:"#111827",marginTop:2}}>{matAObj?.label} <span style={{color:"#9ca3af",fontWeight:400}}>+</span> {matBObj?.label}</div>
+              </div>
+            </div>
+            <div style={{padding:"16px 20px"}}>
+              <p style={{fontSize:14,color:"#4b5563",margin:"0 0 14px",lineHeight:1.65}}>{result.notes}</p>
+              {result.conditions?.length>0&&(
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#9ca3af",letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:8}}>{result.status==="bad"?"⛔ Required precautions":"⚠ Conditions & requirements"}</div>
+                  <div style={{display:"flex",flexDirection:"column",gap:5}}>
+                    {result.conditions.map((c,i)=>(
+                      <div key={i} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"8px 12px",background:"#f9fafb",borderRadius:8,fontSize:13,color:"#1f2937"}}>
+                        <i className={`ti ${result.status==="bad"?"ti-alert-circle":"ti-point"}`} style={{fontSize:14,color:cfg.color,flexShrink:0,marginTop:1}}/>{c}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(matAObj?.brands?.length>0||matBObj?.brands?.length>0)&&(
+                <div style={{marginTop:16,paddingTop:14,borderTop:"0.5px solid #e5e7eb"}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#9ca3af",letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:10}}><i className="ti ti-building-factory-2" style={{fontSize:12,marginRight:5}}/>Manufacturer examples</div>
+                  <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
+                    {[matAObj,matBObj].filter(m=>m?.brands?.length>0).map(mat=>(
+                      <div key={mat.id} style={{flex:"1 1 180px"}}>
+                        <div style={{fontSize:12,fontWeight:700,color:"#6b7280",marginBottom:6}}>{mat.label}</div>
+                        <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                          {mat.brands.map((b,i)=>(
+                            <div key={i} style={{fontSize:12,color:"#4b5563",padding:"4px 10px",background:"#f3f4f6",borderRadius:6,display:"flex",alignItems:"center",gap:6}}>
+                              <i className="ti ti-building-factory" style={{fontSize:11,color:"#9ca3af",flexShrink:0}}/>{b}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{marginTop:14}}>
+            <div style={{fontSize:12,color:"#9ca3af",marginBottom:8}}>Suggested combinations:</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {SUGGESTED.map(([a,b])=>{const r=getCompat(a,b);const c=STATUS_CONFIG[r.status];return(
+                <button key={a+b} onClick={()=>{setMatA(a);setMatB(b);}} style={{fontSize:12,padding:"4px 10px",display:"flex",alignItems:"center",gap:5,borderRadius:6}}>
+                  <i className={`ti ${c.icon}`} style={{fontSize:11,color:c.color}}/>{MATERIALS.find(m=>m.id===a)?.label} + {MATERIALS.find(m=>m.id===b)?.label}
+                </button>
+              );})}
+            </div>
+          </div>
+        </>
+      )}
+      {view==="matrix"&&(
+        <div>
+          <div style={{overflowX:"auto",overflowY:"auto",maxHeight:600,paddingBottom:8}}>
+            <div style={{display:"inline-block",minWidth:"max-content"}}>
+              <div style={{display:"flex",gap:2,marginBottom:2}}>
+                <div style={{width:148,flexShrink:0}}/>
+                {matrixMaterials.map(m=>(
+                  <div key={m.id} style={{width:28,flexShrink:0,textAlign:"center"}}>
+                    <div title={m.label} style={{fontSize:9,color:"#6b7280",writingMode:"vertical-rl",transform:"rotate(180deg)",height:85,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1.2}}>{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {matrixMaterials.map(rowMat=>(
+                <div key={rowMat.id} style={{display:"flex",gap:2,marginBottom:2,alignItems:"center"}}>
+                  <div style={{width:148,flexShrink:0,fontSize:10,color:"#6b7280",textAlign:"right",paddingRight:8,lineHeight:1.2}}>{rowMat.label}</div>
+                  {matrixMaterials.map(colMat=><MatrixCell key={colMat.id} a={rowMat.id} b={colMat.id} onSelect={(a,b)=>{setMatA(a);setMatB(b);setView("lookup");}}/>)}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{display:"flex",gap:14,marginTop:10,flexWrap:"wrap",alignItems:"center"}}>
+            {["ok","warn","bad","check"].map(s=>{const c=STATUS_CONFIG[s];return(
+              <div key={s} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#6b7280"}}>
+                <div style={{width:16,height:16,background:c.bg,border:`1px solid ${c.border}`,borderRadius:3,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                  <i className={`ti ${c.icon}`} style={{fontSize:10,color:c.color}}/>
+                </div>{c.label}
+              </div>
+            );})}
+            <div style={{fontSize:12,color:"#9ca3af",marginLeft:"auto"}}>Click any cell for full details</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Root App ─────────────────────────────────────────────────────────────────
+function App(){
+  const [tab,setTab]=useState("product");
+  return(
+    <div style={{paddingTop:24,paddingBottom:40}}>
+      <div style={{display:"flex",gap:0,marginBottom:24,borderBottom:"2px solid #e5e7eb"}}>
+        {[
+          {id:"product", icon:"ti-sparkles",  label:"Product Search",  sub:"AI-powered · search by name"},
+          {id:"category",icon:"ti-grid-3x3",  label:"Category Lookup", sub:"Browse by material type"},
+        ].map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)}
+            style={{flex:1,maxWidth:260,textAlign:"left",padding:"12px 18px",border:"none",borderRadius:0,background:"transparent",borderBottom:tab===t.id?"2px solid #6366f1":"2px solid transparent",marginBottom:"-2px",cursor:"pointer",transition:"all 0.15s"}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <i className={`ti ${t.icon}`} style={{fontSize:16,color:tab===t.id?"#6366f1":"#9ca3af"}}/>
+              <div>
+                <div style={{fontSize:14,fontWeight:700,color:tab===t.id?"#6366f1":"#374151"}}>{t.label}</div>
+                <div style={{fontSize:11,color:"#9ca3af"}}>{t.sub}</div>
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+      {tab==="product"&&<ProductSearch/>}
+      {tab==="category"&&<CategoryLookup/>}
+      <div style={{marginTop:24,padding:"12px 16px",background:"#f9fafb",borderRadius:8,fontSize:12,color:"#9ca3af",lineHeight:1.65}}>
+        <i className="ti ti-info-circle" style={{fontSize:13,verticalAlign:-2,marginRight:5}}/>
+        General guidance only. Always verify with material datasheets, manufacturer technical support, applicable building codes and a qualified engineer. AI assessments are a starting point, not a final determination.
+      </div>
+    </div>
+  );
+}
+
+    const container = document.getElementById('root');
+    ReactDOM.createRoot(container).render(React.createElement(App));
+  </script>
+</body>
+</html>
